@@ -1,0 +1,59 @@
+Future Technology Devices International Limited (c) 2007-2010, All Rights Reserved
+
+
+CPU_CORE =   VC2, CPU_RAM_SIZE= 16 KB, CPU_ROM_SIZE=256 KB
+
+Linker Version  = V1.0.1 Loader Version =  V1.0.1
+Thu Apr 24 15:21:36 2014
+
+
+=================================================================================================================
+
+SEGMENT_MAP    
+=================================================================================================================
+
+Start Address                  Segment Name                   Segment Size
+=================================================================================================================
+
+0003c0 .text                          000000e4be
+00e87e .dataFlash                     0000000128
+000000 .dataRAM                       0000000128
+000128 .bss                           0000000160
+000288 .HeapRAM                       0000003976
+
+=================================================================================================================
+
+SYMBOL_TABLE   
+=================================================================================================================
+
+SYM ADDRESS PUBLIC SYM NAME                SYM TYPE   MEM TYPE FILE NAME            SYM SIZE  
+NOTE:L=LABEL F=FUNCTION 0=FLASH and 1=RAM
+=================================================================================================================
+
+0043a main                           F              0 AOAtoFT232.obj       001a5
+005df usbhost_connect_state          F              0 AOAtoFT232.obj       000b6
+00695 android_attach                 F              0 AOAtoFT232.obj       001d1
+00866 android_detach                 F              0 AOAtoFT232.obj       00055
+008bb ft232_host_attach              F              0 AOAtoFT232.obj       004eb
+00da6 ft232_host_detach              F              0 AOAtoFT232.obj       00055
+00dfb connect                        F              0 AOAtoFT232.obj       00529
+01324 atof                           F              0 AOAtoFT232.obj       00096
+013ba ftoa                           F              0 AOAtoFT232.obj       0012d
+0001e ft232Baud                      L              1 AOAtoFT232.obj       00004
+00022 ft232Data                      L              1 AOAtoFT232.obj       00001
+00023 ft232Stop                      L              1 AOAtoFT232.obj       00001
+00024 ft232Parity                    L              1 AOAtoFT232.obj       00001
+00025 ft232Flow                      L              1 AOAtoFT232.obj       00001
+00128 hUSBHOST_FT232                 L              1 AOAtoFT232.obj       00002
+0012a hANDROID_ACCESSORY             L              1 AOAtoFT232.obj       00002
+0012c mInitA                         L              1 AOAtoFT232.obj       00006
+00132 mInitF                         L              1 AOAtoFT232.obj       00006
+00138 rAOAw232                       L              1 AOAtoFT232.obj       00040
+00178 r232wAOA                       L              1 AOAtoFT232.obj       00040
+001b8 tcbFTOA                        L              1 AOAtoFT232.obj       00002
+001ba tcbATOF                        L              1 AOAtoFT232.obj       00002
+001bc hUSBHOST_1                     L              1 AOAtoFT232.obj       00002
+001be hUSBHOST_2                     L              1 AOAtoFT232.obj       00002
+001c0 tcbCONNECT                     L              1 AOAtoFT232.obj       00002
+001c2 hGPIO_PORT_A                   L              1 AOAtoFT232.obj       00002
+0e7da iomux_setup                    F              0 AOAtoFT232_iomux.obj 000a4
