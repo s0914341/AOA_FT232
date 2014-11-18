@@ -773,6 +773,16 @@
 	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
+		<filename>Timers.a</filename>
+		<fileType>3</fileType>
+		<isFileDirty>false</isFileDirty>
+		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
+	</LibraryFiles>
+	<BuildList>
+		<filename>Timers.a</filename>
+	</BuildList>
+	<LibraryFiles>
+		<fileDir></fileDir>
 		<filename>string.a</filename>
 		<fileType>3</fileType>
 		<isFileDirty>false</isFileDirty>
@@ -796,6 +806,32 @@
 	<BuildList>
 		<filename>stdio.a</filename>
 	</BuildList>
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>vos.h</filename>
@@ -925,6 +961,13 @@
 	</LibraryFiles>
 	<LibraryFiles>
 		<fileDir></fileDir>
+		<filename>Timers.h</filename>
+		<fileType>4</fileType>
+		<isFileDirty>false</isFileDirty>
+		<VirtualFolder>{00000000-0000-0000-0000-000000000005}</VirtualFolder>
+	</LibraryFiles>
+	<LibraryFiles>
+		<fileDir></fileDir>
 		<filename>errno.h</filename>
 		<fileType>4</fileType>
 		<isFileDirty>false</isFileDirty>
@@ -959,4 +1002,18 @@
 	<OpenFilesList>
 		<filename>AOAtoFT232_iomux.c</filename>
 	</OpenFilesList>
+	<BreakPointList>
+		<filename>AOAtoFT232.c</filename>
+		<lineNo>1041</lineNo>
+		<isEnabled>true</isEnabled>
+	</BreakPointList>
+	<BreakPointList>
+		<filename>AOAtoFT232.c</filename>
+		<lineNo>1071</lineNo>
+		<isEnabled>true</isEnabled>
+	</BreakPointList>
+	<WatchVariableList>
+		<WatchVarName>delay_count</WatchVarName>
+		<DisplayType>2</DisplayType>
+	</WatchVariableList>
 </Project>

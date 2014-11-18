@@ -40,6 +40,8 @@
 #include "stdio.h"
 #include "errno.h"
 #include "string.h"
+#include "time.h"
+#include "Timers.h"
 /* FTDI:EHF */
 
 /* FTDI:SDC Driver Constants */
@@ -52,8 +54,9 @@
 #define VOS_DEV_FAT_FILE_SYSTEM      6
 #define VOS_DEV_UART		         7
 #define VOS_DEV_BOMS			     8
+#define VOS_DEV_TIMER0			     9
 
-#define VOS_NUMBER_DEVICES           9
+#define VOS_NUMBER_DEVICES           10
 /* FTDI:EDC */
 
 /* FTDI:SXH Externs */

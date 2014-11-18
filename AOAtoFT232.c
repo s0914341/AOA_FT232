@@ -31,7 +31,9 @@
 vos_tcb_t *tcbATOF;
 vos_tcb_t *tcbCONNECT;
 vos_tcb_t *tcbUART_SENSOR;
+vos_tcb_t *tcbTICK;
 
+void tick();
 void atof();							// Thread to copy data from Android device to FT232
 void uart_sensor();							// Thread to copy data from FT232 do Android device
 void connect();							// Thread to establish and tear-down USB connections
@@ -71,6 +73,8 @@ unsigned char ft232Parity = USBHOSTFT232_PARITY_NONE;
 unsigned char ft232Flow = USBHOSTFT232_FLOW_NONE;
 unsigned char device_connect_status = 0;
 
+unsigned char delay_count = 0;
+
 /*accessory packet*/
 android_accessory_packet gstAccPacketWriteSensor;
 android_accessory_packet gstAccPacketWrite;
@@ -90,6 +94,8 @@ void main(void)
 	usbhost_context_t usbhostContext;
 	// UART Driver configuration context
 	uart_context_t uartContext;
+	tmr_context_t tmrCtx;
+
 	/* FTDI:EDD */
 
 	/* FTDI:SKI Kernel Initialisation */
@@ -101,6 +107,9 @@ void main(void)
 	iomux_setup();						// Configure the IO pins - just three for LEDs and the debug interface
 	
 	/* FTDI:SDI Driver Initialisation */
+	// Initializes our device with the device manager.
+	tmrCtx.timer_identifier = TIMER_0;
+	tmr_init(VOS_DEV_TIMER0, &tmrCtx);
 	// Initialise UART
 	uartContext.buffer_size = VOS_BUFFER_SIZE_128_BYTES;
 	uart_init(VOS_DEV_UART, &uartContext);
@@ -141,6 +150,12 @@ void main(void)
 	tcbATOF = vos_create_thread_ex(24, 1024, atof, "atof", 0);
 	tcbCONNECT = vos_create_thread_ex(24, 1024, connect, "connect", 0);
 	tcbUART_SENSOR = vos_create_thread_ex(24, 2048, uart_sensor, "uart_sensor", 0);
+	// tick thread
+    tcbTICK = vos_create_thread_ex(24, 1024, tick, "tick", 0);
+
+ 
+
+
 	
 	// Initialize Mutexes as locked
 	vos_init_mutex(&mInitAndroid, VOS_MUTEX_LOCKED);
@@ -556,6 +571,43 @@ void connect()
 	vos_halt_cpu();										// Stop here - a VNC2 reset is required to start again
 }
 #endif
+	
+// *******************************************************************
+// tick thread
+// *******************************************************************
+void tick() {
+
+     VOS_HANDLE hTimer;
+     tmr_ioctl_cb_t tmr_iocb;
+
+     hTimer = vos_dev_open(VOS_DEV_TIMER0);
+     tmr_iocb.ioctl_code = VOS_IOCTL_TIMER_SET_TICK_SIZE;
+     tmr_iocb.param = TIMER_TICK_MS;
+     vos_dev_ioctl(hTimer, &tmr_iocb);
+
+     tmr_iocb.ioctl_code = VOS_IOCTL_TIMER_SET_COUNT;
+     tmr_iocb.param = 500;                        // 500ms
+     vos_dev_ioctl(hTimer, &tmr_iocb);
+
+     tmr_iocb.ioctl_code = VOS_IOCTL_TIMER_SET_DIRECTION;
+     tmr_iocb.param = TIMER_COUNT_DOWN;
+	 vos_dev_ioctl(hTimer, &tmr_iocb);
+
+     tmr_iocb.ioctl_code = VOS_IOCTL_TIMER_SET_MODE;
+     tmr_iocb.param = TIMER_MODE_CONTINUOUS;
+     vos_dev_ioctl(hTimer, &tmr_iocb);
+
+     tmr_iocb.ioctl_code = VOS_IOCTL_TIMER_START;
+     vos_dev_ioctl(hTimer, &tmr_iocb);
+
+     while (1) {
+         tmr_iocb.ioctl_code = VOS_IOCTL_TIMER_WAIT_ON_COMPLETE;
+         vos_dev_ioctl(hTimer, &tmr_iocb);
+		 
+		 if (delay_count > 0)
+	         delay_count--;
+     }
+}
 
 #define CONNECTED_ANDROID    (1<<0)
 #define CONNECTED_FT232      (1<<1)	
@@ -944,6 +996,7 @@ void uart_sensor()
 	unsigned char buffer[PACKET_DATA_SIZE];
 	unsigned short dataAvail, actual, offset;
 	unsigned char status, send_cmd_flag = 0;
+
 	
 	/* UART ioctl call to enable DMA and link to DMA driver */
 	uart_iocb.ioctl_code = VOS_IOCTL_COMMON_ENABLE_DMA;
@@ -985,6 +1038,7 @@ void uart_sensor()
 	*/	
 		if (!send_cmd_flag) {
 		    status = vos_dev_write(hUART, tx_sensor, 16/*sizeof(tx_sensor)*/, NULL);
+			delay_count = 4;
 		    send_cmd_flag = 1;
 			offset = 0;
 		} else {
@@ -1011,6 +1065,11 @@ void uart_sensor()
 					send_cmd_flag = 0;
 				}
 		    }
+			
+			if (delay_count == 0) {
+				offset = 0;
+				send_cmd_flag = 0;
+			}
 		}
 	}
 }
