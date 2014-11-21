@@ -61,16 +61,63 @@
 
 /* FTDI:SXH Externs */
 /* FTDI:EXH */
-#define PACKET_DATA_SIZE   128
-#define PREFIX_VALUE  0x0D
+/* android tablet and VNC2 handshake command */
+enum DATA_TYPE{
+DATA_TYPE_KEYPAD = 0,
+DATA_TYPE_GET_MACHINE_STATUS,
+DATA_TYPE_SEND_SHAKER_COMMAND,
+DATA_TYPE_GET_SHAKER_RETURN,
+DATA_TYPE_GET_EXPERIMENT_DATA,
+DATA_TYPE_SET_EXPERIMENT_SCRIPT,
+
+TOTAL_DATA_TYPE
+};
+
+#define STATUS_OK     0
+#define STATUS_FAIL   1
+
 /*define the accessory packet format*/
+#define PACKET_DATA_SIZE   128
+#define PREFIX_VALUE       0x0D
+#define HEADER_SIZE        5
 typedef struct android_accessory_packet{
         unsigned char u8Prefix;
 		unsigned char u8Type;     /* keypad,slider */
-		unsigned char u8Status;   /* machine status */
+		unsigned char u8Status;   /* reponse */
 		unsigned char u8Reserved; /* reserved for future use */
 		unsigned char u8len;      /* data valid length */
 		unsigned char u8Data[PACKET_DATA_SIZE]; /* data content */
 }android_accessory_packet;
+
+
+/* android get VNC2 informat */
+#define STATUS_SHAKER_NOT_READY          0
+#define STATUS_SHAKER_READY              1
+#define STATUS_SHAKER_NO_RESPONSE        2
+
+#define STATUS_SENSOR_NOT_READY          0
+#define STATUS_SENSOR_READY              1
 		
+#define STATUS_MASS_STORAGE_NOT_READY    0
+#define STATUS_MASS_STORAGE_READY        1
+		
+#define STATUS_SPI_STORAGE_NOT_READY     0
+#define STATUS_SPI_STORAGE_READY         1
+		
+#define STATUS_EXPERIMENT_IDLE           0
+#define STATUS_EXPERIMENT_DOING          1
+#define STATUS_EXPERIMENT_STORAGE_FULL   2
+#define STATUS_EXPERIMENT_FINISH         3
+		
+#define SYNCHRONOUS_NO_DATA              0
+#define SYNCHRONOUS_NEED                 1
+		
+typedef struct {
+		unsigned char shaker_status;
+		unsigned char sensor_status;
+		unsigned char mass_storage_status;
+		unsigned char spi_storage_status;
+		unsigned char experiment_status;
+		unsigned char synchronous_sensor_data;
+} machine_status;
 #endif /* _AOAtoFT232_H_ */

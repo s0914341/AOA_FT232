@@ -21,22 +21,15 @@
 
 #include "AOAtoFT232.h"
 
-
-#define DATA_TYPE_KEYPAD	        0
-#define DATA_TYPE_SLIDER	        1
-#define DATA_TYPE_SHAKER_COMMAND	2
-#define DATA_TYPE_SHAKER_RETURN	    3
-#define DATA_TYPE_SENSOR_DATA	    4
-
-vos_tcb_t *tcbATOF;
-vos_tcb_t *tcbCONNECT;
+vos_tcb_t *tcbANDROID_RECEIVER;
+vos_tcb_t *tcbSHAKER_RECEIVER;
 vos_tcb_t *tcbUART_SENSOR;
-vos_tcb_t *tcbTICK;
+vos_tcb_t *tcbTIMER_TICK;
 
-void tick();
-void atof();							// Thread to copy data from Android device to FT232
-void uart_sensor();							// Thread to copy data from FT232 do Android device
-void connect();							// Thread to establish and tear-down USB connections
+void timer_tick();
+void android_receiver();				// Thread to copy data from Android device to FT232
+void uart_sensor();						// Thread to copy data from FT232 do Android device
+void shaker_receiver();							// Thread to establish and tear-down USB connections
 
 VOS_HANDLE hUSBHOST1_Android; 					// USB Host Port 1 - connect to Android device
 VOS_HANDLE hUSBHOST2; 					// USB Host Port 2 - connect to FT232
@@ -51,6 +44,8 @@ VOS_HANDLE hUART;                      // UART Interface Driver
 
 vos_mutex_t mInitAndroid;						// Mutex to halt AOA activity until setup is complete
 vos_mutex_t mInitF;						// Mutex to halt FT232 activity until setup is complete
+
+machine_status machine_info;
 
 /* Default settings for UART interface */
 #define DEF_UART_BAUD		UART_BAUD_115200
@@ -76,7 +71,11 @@ unsigned char device_connect_status = 0;
 unsigned char delay_count = 0;
 
 /*accessory packet*/
-android_accessory_packet gstAccPacketWriteSensor;
+#define SHAKER_BUFFER_SIZE   64
+uint8 shaker_buffer[SHAKER_BUFFER_SIZE];
+uint8 shaker_buffer_start;
+uint8 shaker_data_size;
+//android_accessory_packet gstAccPacketWriteSensor;
 android_accessory_packet gstAccPacketWrite;
 android_accessory_packet gstAccPacketRead;
 /* Declaration for IOMUx setup function */
@@ -145,18 +144,24 @@ void main(void)
 	hUSBHOST2 = vos_dev_open(VOS_DEV_USBHOST_2);		// Open USB Host Port 2
 	// Open UART handles
 	hUART = vos_dev_open(VOS_DEV_UART);
-	
+
+	shaker_buffer_start = 0;
+	shaker_data_size = 0;
+	machine_info.shaker_status = STATUS_SHAKER_NOT_READY;
+	machine_info.sensor_status = STATUS_SENSOR_NOT_READY;
+	machine_info.mass_storage_status = STATUS_MASS_STORAGE_NOT_READY;
+	machine_info.spi_storage_status = STATUS_SPI_STORAGE_NOT_READY;
+	machine_info.experiment_status = STATUS_EXPERIMENT_IDLE;
+	machine_info.synchronous_sensor_data = SYNCHRONOUS_NO_DATA;
+
 	/* Create threads */
-	tcbATOF = vos_create_thread_ex(24, 1024, atof, "atof", 0);
-	tcbCONNECT = vos_create_thread_ex(24, 1024, connect, "connect", 0);
+	tcbANDROID_RECEIVER = vos_create_thread_ex(24, 1024, android_receiver, "android_receiver", 0);
+	tcbSHAKER_RECEIVER = vos_create_thread_ex(24, 1024, shaker_receiver, "shaker_receiver", 0);
 	tcbUART_SENSOR = vos_create_thread_ex(24, 2048, uart_sensor, "uart_sensor", 0);
-	// tick thread
-    tcbTICK = vos_create_thread_ex(24, 1024, tick, "tick", 0);
+	/* timer tick thread */
+    tcbTIMER_TICK = vos_create_thread_ex(24, 1024, timer_tick, "timer_tick", 0);
 
  
-
-
-	
 	// Initialize Mutexes as locked
 	vos_init_mutex(&mInitAndroid, VOS_MUTEX_LOCKED);
 	vos_init_mutex(&mInitF, VOS_MUTEX_LOCKED);
@@ -573,9 +578,9 @@ void connect()
 #endif
 	
 // *******************************************************************
-// tick thread
+// timer tick thread
 // *******************************************************************
-void tick() {
+void timer_tick() {
 
      VOS_HANDLE hTimer;
      tmr_ioctl_cb_t tmr_iocb;
@@ -611,7 +616,7 @@ void tick() {
 
 #define CONNECTED_ANDROID    (1<<0)
 #define CONNECTED_FT232      (1<<1)	
-void connect()
+void shaker_receiver()
 {
 	common_ioctl_cb_t ft232_iocb;
 		
@@ -673,29 +678,34 @@ void connect()
 			    // start polling to ensure we receive data in the RX Queue
 			    ft232_iocb.ioctl_code = VOS_IOCTL_USBHOSTFT232_START_POLL;
 			    vos_dev_ioctl(hUSBHOST_FT232, &ft232_iocb);
+				machine_info.shaker_status = STATUS_SHAKER_READY;
 				while (device_connect_status&CONNECTED_FT232) {
 					ft232_iocb.ioctl_code = VOS_IOCTL_COMMON_GET_RX_QUEUE_STATUS;					// check whether any data is 
 		            status = vos_dev_ioctl(hUSBHOST_FT232, &ft232_iocb);							// available at from the FT232
 		            dataAvail = ft232_iocb.get.queue_stat;
 
-		            if (dataAvail > sizeof(gstAccPacketWrite.u8Data)) {				// If there is more data than the buffer size.
-			            dataAvail = sizeof(gstAccPacketWrite.u8Data); 				// ... then limit the number of bytes to the buffer size
+		            if (dataAvail > SHAKER_BUFFER_SIZE) {				// If there is more data than the buffer size.
+			            dataAvail = SHAKER_BUFFER_SIZE; 				// ... then limit the number of bytes to the buffer size
 		            }
 					
 					if (dataAvail > 0) {								// If there is any data available
-				        status = vos_dev_read(hUSBHOST_FT232, gstAccPacketWrite.u8Data, dataAvail, &actual); 		// read from FT232 device
-						if (hANDROID_ACCESSORY != NULL) {
-							gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
-							gstAccPacketWrite.u8Type = DATA_TYPE_SHAKER_RETURN;
-							gstAccPacketWrite.u8len = actual;
-							vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
-							status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketWrite, gstAccPacketWriteSensor.u8len+5, &actualw);		// then write to Android device
-						    vos_unlock_mutex(&mInitAndroid);						// unlock the AOA mutex
-						}
+				        status = vos_dev_read(hUSBHOST_FT232, shaker_buffer, dataAvail, &actual); 		// read from FT232 device
+						/* ring buffer for receive shaker return data */
+						if ((shaker_data_size+actual) > SHAKER_BUFFER_SIZE) {
+							if ((shaker_buffer_start + ((shaker_data_size+actual) - SHAKER_BUFFER_SIZE)) <  SHAKER_BUFFER_SIZE) {
+								shaker_buffer_start = shaker_buffer_start + ((shaker_data_size+actual) - SHAKER_BUFFER_SIZE);
+							} else {
+							    shaker_buffer_start = (shaker_buffer_start + ((shaker_data_size+actual) - SHAKER_BUFFER_SIZE))-SHAKER_BUFFER_SIZE;
+							}
+							shaker_data_size = SHAKER_BUFFER_SIZE;
+						} else {
+						    shaker_data_size += actual;
+					    }
 		            }
 					
 					if (!usbhost_connect_state(hUSBHOST2)) {
 						device_connect_status &= ~CONNECTED_FT232;
+						machine_info.shaker_status = STATUS_SHAKER_NOT_READY;
 			            android_detach(hUSBHOST_FT232);					// Break down the Android device connection
 				        vos_gpio_write_pin(GPIO_A_2, 1);				// Turn off LED at USB1
 				        //hUSBHOST2_FT232 = NULL;
@@ -716,15 +726,78 @@ void connect()
 	Comments:
 	This thread reads data from the Android device on USB1 and copies it to the FT232 on USB2
 */	
+unsigned char get_shaker_return()
+{
+	unsigned char offset, len;
 	
+	gstAccPacketWrite.u8len = shaker_data_size;
+	if ((shaker_buffer_start + shaker_data_size) <= SHAKER_BUFFER_SIZE) {
+	    memcpy(gstAccPacketWrite.u8Data, &shaker_buffer[shaker_buffer_start], shaker_data_size);
+		shaker_buffer_start += shaker_data_size;
+		shaker_data_size = 0;
+    } else {
+	     offset = 0;
+		 len = SHAKER_BUFFER_SIZE - shaker_buffer_start;
+	     memcpy(&gstAccPacketWrite.u8Data[offset], &shaker_buffer[shaker_buffer_start], len);
+		 len = shaker_data_size - len;
+		 offset = SHAKER_BUFFER_SIZE - shaker_buffer_start;
+		 memcpy(&gstAccPacketWrite.u8Data[offset], &shaker_buffer[0], len);
+		 shaker_buffer_start = len;
+		 shaker_data_size = 0;
+	}
+	
+    gstAccPacketWrite.u8Status = STATUS_OK;
+	return (HEADER_SIZE + gstAccPacketWrite.u8len);
+}
+	
+unsigned char get_experiment_data(unsigned char *data, unsigned char data_len)
+{
+	gstAccPacketWrite.u8Status = STATUS_OK;
+	gstAccPacketWrite.u8len = 0;
+	return (HEADER_SIZE + gstAccPacketWrite.u8len);	
+}
+	
+unsigned char send_shaker_command(unsigned char *data, unsigned char data_len)
+{
+	unsigned char status;
+	unsigned short actualw = 0;
+	
+	/* then write to the FT232 */
+	if (hUSBHOST_FT232 != NULL)
+	     status = vos_dev_write(hUSBHOST_FT232, data, data_len, &actualw);	
+		
+	gstAccPacketWrite.u8Status = STATUS_OK;
+	gstAccPacketWrite.u8len = 0;
+	return (HEADER_SIZE + gstAccPacketWrite.u8len);	
+}
+	
+unsigned char get_machine_status()
+{
+	memcpy(gstAccPacketWrite.u8Data, &machine_info, sizeof(machine_info));
+	gstAccPacketWrite.u8Status = STATUS_OK;
+	gstAccPacketWrite.u8len = sizeof(machine_info);
+	return (HEADER_SIZE + gstAccPacketWrite.u8len);	
+}
+
 #define LED_BUTTON_MAP	   	(0x78)
-#if 1
-void atof()
+unsigned char keypad(unsigned char key)
+{
+	uint8 u8Data;
+	
+	/*update the led bitmap*/
+	u8Data = (key << 3);
+    u8Data &= LED_BUTTON_MAP;
+	vos_dev_write(hGPIO_PORT_B,&u8Data, 1, NULL);
+	gstAccPacketWrite.u8Status = STATUS_OK;
+	gstAccPacketWrite.u8len = 0;
+    return (HEADER_SIZE + gstAccPacketWrite.u8len);	
+}
+
+void android_receiver()
 {
 	common_ioctl_cb_t aoa_iocb;
-	unsigned char status, i;
+	unsigned char status, i, write_len;
 	unsigned short dataAvail = 0, actual = 0, actualw = 0;
-	uint8 u8Data;
 	unsigned char numRead = 0;
 	unsigned char blink = 0;
 	gpio_ioctl_cb_t gpio_ioca;
@@ -744,9 +817,7 @@ void atof()
 	vos_dev_ioctl(hGPIO_PORT_B, &gpio_ioca);
 	hGPIO_PORT_B = vos_dev_open(VOS_DEV_GPIO_PORT_B);	// Open up the GPIO port - used for LEDs
 	vos_dev_ioctl(hGPIO_PORT_B, &gpio_ioca);
-	//vos_gpio_write_port(GPIO_PORT_B, 0xFF);				// Pre-set PORT A all high - prevents glitch
-	//vos_gpio_set_port_mode(GPIO_PORT_B, 0xFF); 			// Port A all output
-
+	
 	hUSBHOST1_Android = vos_dev_open(VOS_DEV_USBHOST_1);		// Open USB Host Port 1 for android
 	while(1)
 	{
@@ -765,24 +836,33 @@ void atof()
 					    if (!status) {
 		                    if(numRead >= (sizeof(gstAccPacketRead)-sizeof(gstAccPacketRead.u8Data))) {
 		                        // process the message from the Android device
+								write_len = 0;
+								gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
+								gstAccPacketWrite.u8Type = gstAccPacketRead.u8Type;
 								switch (gstAccPacketRead.u8Type) {
 									case DATA_TYPE_KEYPAD:
-								        /*update the led bitmap*/
-						                u8Data = (gstAccPacketRead.u8Data[0] << 3);
-				                        u8Data &= LED_BUTTON_MAP;
-			                            vos_dev_write(hGPIO_PORT_B,&u8Data, 1, NULL);
+										write_len = keypad(gstAccPacketRead.u8Data[0]);
 									break;
 									
-									case DATA_TYPE_SLIDER:
-									    //u8Changed = 1;
-				                        //u8PwmDutyCycle = gstAccPacketRead.u8Data;
+									case DATA_TYPE_GET_MACHINE_STATUS:
+										write_len = get_machine_status();
 									break;
 									
-									case DATA_TYPE_SHAKER_COMMAND:
-									    if (hUSBHOST_FT232 != NULL)
-									         status = vos_dev_write(hUSBHOST_FT232, gstAccPacketRead.u8Data, gstAccPacketRead.u8len, &actualw);				// then write to the FT232
+									case DATA_TYPE_SEND_SHAKER_COMMAND:
+									    write_len = send_shaker_command(gstAccPacketRead.u8Data, gstAccPacketRead.u8len);
+									break;
+									
+									case DATA_TYPE_GET_SHAKER_RETURN:
+									    write_len = get_shaker_return();
+									break;
+									
+									case DATA_TYPE_GET_EXPERIMENT_DATA:
+									    write_len = get_experiment_data(gstAccPacketRead.u8Data, gstAccPacketRead.u8len);
 									break;
 								}
+								
+								if (write_len > 0)
+									status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketWrite, write_len, &actualw);	
 							} 
 					    }
 				    } else {
@@ -817,7 +897,7 @@ void atof()
 		//vos_unlock_mutex(&mInitA);						// unlock the AOA mutex
 	}
 }
-#endif
+
 #if 0	
 void atof()
 {
@@ -972,10 +1052,10 @@ void write_sensor_data_to_android(unsigned char *buf, unsigned short len)
 {
 	unsigned short actualw;
 	unsigned char status;
-	
+#if 0	
 	if (hANDROID_ACCESSORY != NULL) {
 		gstAccPacketWriteSensor.u8Prefix = PREFIX_VALUE;
-		gstAccPacketWriteSensor.u8Type = DATA_TYPE_SENSOR_DATA;
+		gstAccPacketWriteSensor.u8Type = DATA_TYPE_GET_EXPERIMENT_DATA;
 		gstAccPacketWriteSensor.u8len = len;
 		
 		memcpy(gstAccPacketWriteSensor.u8Data, buf, gstAccPacketWriteSensor.u8len);
@@ -983,6 +1063,7 @@ void write_sensor_data_to_android(unsigned char *buf, unsigned short len)
 		status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketWriteSensor, gstAccPacketWriteSensor.u8len+5, &actualw);		// then write to Android device
 		vos_unlock_mutex(&mInitAndroid);						// unlock the AOA mutex
 	}
+#endif
 }
 /*
 	Thread Name:  uart_sensor()
@@ -1028,8 +1109,7 @@ void uart_sensor()
 	uart_iocb.set.param = DEF_UART_PARITY;
 	vos_dev_ioctl(hUART, &uart_iocb);
 	
-	while(1)
-	{
+	while(1) {
 		// wait for enumeration to complete
 	/*	vos_delay_msecs(100);
 		vos_gpio_write_pin(GPIO_B_3, 0);
@@ -1037,7 +1117,7 @@ void uart_sensor()
 		vos_gpio_write_pin(GPIO_B_3, 1);
 	*/	
 		if (!send_cmd_flag) {
-		    status = vos_dev_write(hUART, tx_sensor, 16/*sizeof(tx_sensor)*/, NULL);
+		    status = vos_dev_write(hUART, (uint8*)tx_sensor, 16/*sizeof(tx_sensor)*/, NULL);
 			delay_count = 4;
 		    send_cmd_flag = 1;
 			offset = 0;
@@ -1058,17 +1138,21 @@ void uart_sensor()
 				    if (buffer[0] == 'i' && buffer[1] == 'n' && buffer[2] == 'd'
                         &&	buffer[3] == 'e' && buffer[4] == 'x' ) {
 						//	buffer[offset] = '\n';
-						    write_sensor_data_to_android(buffer, offset);
+						//  write_sensor_data_to_android(buffer, offset);
 							write_sensor_data_to_file(buffer, offset);
 					}
 					offset = 0;
 					send_cmd_flag = 0;
+					/* sensor uart has reponse */
+					machine_info.sensor_status = STATUS_SENSOR_READY;
 				}
 		    }
 			
 			if (delay_count == 0) {
 				offset = 0;
 				send_cmd_flag = 0;
+				/* sensor uart timeout no reponse */
+				machine_info.sensor_status = STATUS_SENSOR_NOT_READY;
 			}
 		}
 	}

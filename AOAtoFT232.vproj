@@ -676,7 +676,8 @@
 	</BuildList>
 	<BuildList>
 		<filename>AOAtoFT232_iomux.c</filename>
-	</BuildList>	<LibraryFiles>
+	</BuildList>
+	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>kernel.a</filename>
 		<fileType>3</fileType>
@@ -806,32 +807,6 @@
 	<BuildList>
 		<filename>stdio.a</filename>
 	</BuildList>
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>vos.h</filename>
@@ -991,27 +966,38 @@
 		<fileType>4</fileType>
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000006}</VirtualFolder>
-	</LibraryFiles>
+	</LibraryFiles>	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	<OpenFilesList>
 		<filename>AOAtoFT232.c</filename>
+		<actvieTabIndex>0</actvieTabIndex>
 	</OpenFilesList>
 	<OpenFilesList>
 		<filename>AOAtoFT232.h</filename>
-		<actvieTabIndex>1</actvieTabIndex>
 	</OpenFilesList>
 	<OpenFilesList>
 		<filename>AOAtoFT232_iomux.c</filename>
 	</OpenFilesList>
-	<BreakPointList>
-		<filename>AOAtoFT232.c</filename>
-		<lineNo>1041</lineNo>
-		<isEnabled>true</isEnabled>
-	</BreakPointList>
-	<BreakPointList>
-		<filename>AOAtoFT232.c</filename>
-		<lineNo>1071</lineNo>
-		<isEnabled>true</isEnabled>
-	</BreakPointList>
 	<WatchVariableList>
 		<WatchVarName>delay_count</WatchVarName>
 		<DisplayType>2</DisplayType>
