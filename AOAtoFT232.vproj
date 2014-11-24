@@ -988,6 +988,74 @@
 	
 	
 	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	<OpenFilesList>
 		<filename>AOAtoFT232.c</filename>
 		<actvieTabIndex>0</actvieTabIndex>
@@ -997,6 +1065,18 @@
 	</OpenFilesList>
 	<OpenFilesList>
 		<filename>AOAtoFT232_iomux.c</filename>
+	</OpenFilesList>
+	<OpenFilesList>
+		<filename>FAT.h</filename>
+	</OpenFilesList>
+	<OpenFilesList>
+		<filename>MSI.h</filename>
+	</OpenFilesList>
+	<OpenFilesList>
+		<filename>BOMS.h</filename>
+	</OpenFilesList>
+	<OpenFilesList>
+		<filename>AOAtoFT232.map</filename>
 	</OpenFilesList>
 	<WatchVariableList>
 		<WatchVarName>delay_count</WatchVarName>

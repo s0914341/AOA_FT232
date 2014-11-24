@@ -69,6 +69,9 @@ DATA_TYPE_SEND_SHAKER_COMMAND,
 DATA_TYPE_GET_SHAKER_RETURN,
 DATA_TYPE_GET_EXPERIMENT_DATA,
 DATA_TYPE_SET_EXPERIMENT_SCRIPT,
+DATA_TYPE_SET_EXPERIMENT_STATUS,
+
+DATA_TYPE_NOTIFY_EXPERIMENT_DATA,
 
 TOTAL_DATA_TYPE
 };
@@ -105,19 +108,42 @@ typedef struct android_accessory_packet{
 #define STATUS_SPI_STORAGE_READY         1
 		
 #define STATUS_EXPERIMENT_IDLE           0
-#define STATUS_EXPERIMENT_DOING          1
-#define STATUS_EXPERIMENT_STORAGE_FULL   2
-#define STATUS_EXPERIMENT_FINISH         3
+#define STATUS_EXPERIMENT_START          1 
+#define STATUS_EXPERIMENT_RUNNING        2
+#define STATUS_EXPERIMENT_STOP           3
+#define STATUS_EXPERIMENT_STORAGE_FULL   4
+#define STATUS_EXPERIMENT_FINISH         5
 		
 #define SYNCHRONOUS_NO_DATA              0
 #define SYNCHRONOUS_NEED                 1
 		
 typedef struct {
-		unsigned char shaker_status;
-		unsigned char sensor_status;
-		unsigned char mass_storage_status;
-		unsigned char spi_storage_status;
-		unsigned char experiment_status;
-		unsigned char synchronous_sensor_data;
+	uint8 shaker_status;
+	uint8 sensor_status;
+	uint8 mass_storage_status;
+	uint8 spi_storage_status;
+	uint8 experiment_status;
+	uint8 experiment_progress;
+	uint8 synchronous_sensor_data;
 } machine_status;
+		
+#define CONNECTED_ANDROID    (1<<0)
+#define CONNECTED_FT232      (1<<1)	
+
+#define EXPERIMENT_SCRIPT_HEADER    0xEE
+typedef struct {
+	uint8 header;
+	uint8 item_num;
+} experiment_script_header;
+
+#define EXPERIMENT_INSTRUCT_SHAKER    (1)
+#define EXPERIMENT_INSTRUCT_SENSOR    (2)
+#define EXPERIMENT_INSTRUCT_DELAY     (3) 
+#define EXPERIMENT_INSTRUCT_FINISH    (4) 
+typedef struct {
+	uint8 instruct_type;
+	uint8 arg_len;
+	uint8 arg[4];
+} script_instruction;
+		
 #endif /* _AOAtoFT232_H_ */
