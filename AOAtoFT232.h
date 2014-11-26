@@ -62,6 +62,11 @@
 /* FTDI:SXH Externs */
 /* FTDI:EXH */
 /* android tablet and VNC2 handshake command */
+#define ERR_OPEN_FILE_FAIL    (1<<0)
+#define ERR_WRITE_FILE_FAIL   (1<<1)
+#define ERR_READ_FILE_FAIL    (1<<2)
+#define ERR_CLOSE_FILE_FAIL   (1<<3)
+
 enum DATA_TYPE{
 DATA_TYPE_KEYPAD = 0,
 DATA_TYPE_GET_MACHINE_STATUS,
@@ -76,8 +81,10 @@ DATA_TYPE_NOTIFY_EXPERIMENT_DATA,
 TOTAL_DATA_TYPE
 };
 
-#define STATUS_OK     0
-#define STATUS_FAIL   1
+#define STATUS_OK           0
+#define STATUS_FAIL         1
+#define STATUS_HAVE_DATA    2 
+#define STATUS_START        3 
 
 /*define the accessory packet format*/
 #define PACKET_DATA_SIZE   128
@@ -93,7 +100,7 @@ typedef struct android_accessory_packet{
 }android_accessory_packet;
 
 
-/* android get VNC2 informat */
+/* android get VNC2 machine informat */
 #define STATUS_SHAKER_NOT_READY          0
 #define STATUS_SHAKER_READY              1
 #define STATUS_SHAKER_NO_RESPONSE        2
@@ -130,17 +137,25 @@ typedef struct {
 #define CONNECTED_ANDROID    (1<<0)
 #define CONNECTED_FT232      (1<<1)	
 
+/* experiment script file struct */
 #define EXPERIMENT_SCRIPT_HEADER    0xEE
 typedef struct {
 	uint8 header;
 	uint8 item_num;
 } experiment_script_header;
 
-#define EXPERIMENT_INSTRUCT_SHAKER    (1)
-#define EXPERIMENT_INSTRUCT_SENSOR    (2)
-#define EXPERIMENT_INSTRUCT_DELAY     (3) 
-#define EXPERIMENT_INSTRUCT_FINISH    (4) 
+enum INSTRUCT_TYPE{
+EXPERIMENT_INSTRUCT_SHAKER = 0,
+EXPERIMENT_INSTRUCT_SENSOR,
+EXPERIMENT_INSTRUCT_DELAY,
+EXPERIMENT_INSTRUCT_LOOP,
+EXPERIMENT_INSTRUCT_FINISH,
+
+TOTAL_INSTRUCT_TYPE
+};
+
 typedef struct {
+	uint8 instruct_index;
 	uint8 instruct_type;
 	uint8 arg_len;
 	uint8 arg[4];

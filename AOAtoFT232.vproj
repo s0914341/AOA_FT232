@@ -966,77 +966,14 @@
 		<fileType>4</fileType>
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000006}</VirtualFolder>
+	</LibraryFiles>
+	<LibraryFiles>
+		<fileDir></fileDir>
+		<filename>stdlib.h</filename>
+		<fileType>4</fileType>
+		<isFileDirty>false</isFileDirty>
+		<VirtualFolder>{00000000-0000-0000-0000-000000000006}</VirtualFolder>
 	</LibraryFiles>	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	
 	
 	
@@ -1067,19 +1004,32 @@
 		<filename>AOAtoFT232_iomux.c</filename>
 	</OpenFilesList>
 	<OpenFilesList>
-		<filename>FAT.h</filename>
+		<filename>stdio.h</filename>
 	</OpenFilesList>
-	<OpenFilesList>
-		<filename>MSI.h</filename>
-	</OpenFilesList>
-	<OpenFilesList>
-		<filename>BOMS.h</filename>
-	</OpenFilesList>
-	<OpenFilesList>
-		<filename>AOAtoFT232.map</filename>
-	</OpenFilesList>
+	<BreakPointList>
+		<filename>AOAtoFT232.c</filename>
+		<lineNo>1050</lineNo>
+		<isEnabled>true</isEnabled>
+	</BreakPointList>
+	<BreakPointList>
+		<filename>AOAtoFT232.c</filename>
+		<lineNo>848</lineNo>
+		<isEnabled>true</isEnabled>
+	</BreakPointList>
 	<WatchVariableList>
 		<WatchVarName>delay_count</WatchVarName>
+		<DisplayType>2</DisplayType>
+	</WatchVariableList>
+	<WatchVariableList>
+		<WatchVarName>instruct</WatchVarName>
+		<DisplayType>2</DisplayType>
+	</WatchVariableList>
+	<WatchVariableList>
+		<WatchVarName>instruction_exec_status</WatchVarName>
+		<DisplayType>2</DisplayType>
+	</WatchVariableList>
+	<WatchVariableList>
+		<WatchVarName>gstAccPacketWrite</WatchVarName>
 		<DisplayType>2</DisplayType>
 	</WatchVariableList>
 </Project>
