@@ -141,24 +141,28 @@ typedef struct {
 #define EXPERIMENT_SCRIPT_HEADER    0xEE
 typedef struct {
 	uint8 header;
-	uint8 item_num;
+	uint32 total_instruction_number;
 } experiment_script_header;
-
+	
 enum INSTRUCT_TYPE{
-EXPERIMENT_INSTRUCT_SHAKER = 0,
-EXPERIMENT_INSTRUCT_SENSOR,
-EXPERIMENT_INSTRUCT_DELAY,
-EXPERIMENT_INSTRUCT_LOOP,
-EXPERIMENT_INSTRUCT_FINISH,
+INSTRUCT_READ_SENSOR = 0,
+INSTRUCT_SHAKER_ON, 
+INSTRUCT_SHAKER_OFF,
+INSTRUCT_SHAKER_SET_TEMPERATURE,
+INSTRUCT_SHAKER_SET_SPEED,
+INSTRUCT_REPEAT_COUNT,
+INSTRUCT_REPEAT_TIME,
+INSTRUCT_DELAY,
+INSTRUCT_FINISH,
 
 TOTAL_INSTRUCT_TYPE
 };
 
 typedef struct {
-	uint8 instruct_index;
-	uint8 instruct_type;
-	uint8 arg_len;
-	uint8 arg[4];
+	uint32 instruct_index;
+	uint32 instruct_type;
+	uint32 arg1;
+	uint32 arg2;
 } script_instruction;
 		
 #endif /* _AOAtoFT232_H_ */

@@ -982,17 +982,6 @@
 	
 	
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	<OpenFilesList>
 		<filename>AOAtoFT232.c</filename>
 		<actvieTabIndex>0</actvieTabIndex>
@@ -1008,12 +997,7 @@
 	</OpenFilesList>
 	<BreakPointList>
 		<filename>AOAtoFT232.c</filename>
-		<lineNo>1050</lineNo>
-		<isEnabled>true</isEnabled>
-	</BreakPointList>
-	<BreakPointList>
-		<filename>AOAtoFT232.c</filename>
-		<lineNo>848</lineNo>
+		<lineNo>863</lineNo>
 		<isEnabled>true</isEnabled>
 	</BreakPointList>
 	<WatchVariableList>

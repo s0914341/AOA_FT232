@@ -71,6 +71,12 @@ unsigned char device_connect_status = 0;
 uint8 delay_count = 0;
 uint8 experiment_delay = 0;
 
+const char *shaker_on = "ON ";
+const char *shaker_off = "OF ";
+const char *shaker_speed = "SS0";
+const char *shaker_temperature = "SC";
+const char *shaker_end = "0 ";
+
 /*accessory packet*/
 #define SHAKER_BUFFER_SIZE   64
 uint8 shaker_buffer[SHAKER_BUFFER_SIZE];
@@ -553,6 +559,16 @@ void shaker_receiver()
 	Comments:
 	This thread reads data from the Android device on USB1 and copies it to the FT232 on USB2
 */	
+uint8 write_data_to_shaker(uint8 *data, uint8 data_len, uint16 *actualw)
+{	
+	uint8 status = 1;
+	/* then write to the FT232 */
+	if (hUSBHOST_FT232 != NULL)
+	     status = vos_dev_write(hUSBHOST_FT232, data, data_len, actualw);	
+		
+	return status;
+}
+	
 uint8 get_shaker_return()
 {
 	uint8 offset, len;
@@ -688,11 +704,10 @@ uint8 get_experiment_data(uint8 *data, uint8 data_len)
 uint8 send_shaker_command(uint8 *data, uint8 data_len)
 {
 	uint8 status, write_len;
-	unsigned short actualw = 0;
+	uint16 actualw = 0;
 	
 	/* then write to the FT232 */
-	if (hUSBHOST_FT232 != NULL)
-	     status = vos_dev_write(hUSBHOST_FT232, data, data_len, &actualw);	
+	status = write_data_to_shaker(data, data_len, &actualw);
 		
 	vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
 	gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
@@ -901,7 +916,7 @@ uint8 check_mass_storage_status(uint8 *status)
 #define INSTRUCTION_EXEC_RUNNING    2
 #define INSTRUCTION_EXEC_END        3
 	
-uint8 check_experiment_script(uint8 *instruction, uint8 *exec_status, uint8 *cur_instruct_index, uint8 *cur_loop_count)
+uint8 check_experiment_script(uint32 *instruction, uint8 *exec_status, uint32 *cur_instruct_index, uint32 *cur_loop_count)
 {
 	FILE *file;
 	uint8 ret = 0;
@@ -920,12 +935,12 @@ uint8 check_experiment_script(uint8 *instruction, uint8 *exec_status, uint8 *cur
 		//(*cur_instruct_index)++;
 		fseek(file, (*cur_instruct_index)*sizeof(instruct), SEEK_CUR);
 		fread(&instruct, sizeof(instruct), 1, file);
-	    if (EXPERIMENT_INSTRUCT_LOOP == instruct.instruct_type) {
-			if ((*cur_loop_count) == instruct.arg[1]) {
+	    if (INSTRUCT_REPEAT_COUNT == instruct.instruct_type) {
+			if ((*cur_loop_count) == instruct.arg1) {
 		        fread(&instruct, sizeof(instruct), 1, file);
 				(*cur_loop_count) = 0;
 			} else {
-		        fseek(file, (instruct.arg[0])*sizeof(instruct) + sizeof(header), SEEK_SET);
+		        fseek(file, (instruct.arg2)*sizeof(instruct) + sizeof(header), SEEK_SET);
 		        fread(&instruct, sizeof(instruct), 1, file);
 				(*cur_loop_count)++;
 			}
@@ -1065,6 +1080,7 @@ void experiment_task()
 {
 	common_ioctl_cb_t uart_iocb;
 	uint8 ret = 0;
+	uint16 actualw;
 	uint8 experiment_instruction = 0, instruction_exec_status = INSTRUCTION_EXEC_END;
 	uint8 cur_instruct_index = 0, cur_loop_count = 0;
 
@@ -1107,23 +1123,45 @@ void experiment_task()
 		vos_gpio_write_pin(GPIO_B_3, 0);
 		vos_delay_msecs(100);
 		vos_gpio_write_pin(GPIO_B_3, 1);
+		
 	*/	
 	    if (0 == check_mass_storage_status(&machine_info.mass_storage_status)) {
 			if ((STATUS_EXPERIMENT_START == experiment_status) || (STATUS_EXPERIMENT_RUNNING == experiment_status)) {
 				if (0 == check_experiment_script(&experiment_instruction, &instruction_exec_status, &cur_instruct_index, &cur_loop_count)) {
 					switch(experiment_instruction) {
-					    case EXPERIMENT_INSTRUCT_SHAKER:
-						break;
-						
-						case EXPERIMENT_INSTRUCT_SENSOR:
+						case INSTRUCT_READ_SENSOR:
 						    ret = read_sensor_data(&instruction_exec_status);
 						break;
 						
-						case EXPERIMENT_INSTRUCT_DELAY:
+						case INSTRUCT_SHAKER_ON:
+						    ret = write_data_to_shaker(shaker_on, sizeof(shaker_on), &actualw);
+						break;
+						
+						case INSTRUCT_SHAKER_OFF:
+						    ret = write_data_to_shaker(shaker_off, sizeof(shaker_off), &actualw);
+						break;
+						
+						case INSTRUCT_SHAKER_SET_TEMPERATURE:
+						    ret = write_data_to_shaker(shaker_temperature, sizeof(shaker_temperature), &actualw);
+							ret = write_data_to_shaker(shaker_end, sizeof(shaker_end), &actualw);
+						break;
+						
+						case INSTRUCT_SHAKER_SET_SPEED:
+						    ret = write_data_to_shaker(shaker_speed, sizeof(shaker_speed), &actualw);
+							ret = write_data_to_shaker(shaker_end, sizeof(shaker_end), &actualw);
+						break;
+						
+						case INSTRUCT_REPEAT_COUNT:
+						break;
+						
+						case INSTRUCT_REPEAT_TIME:
+						break;
+
+						case INSTRUCT_DELAY:
 						    ret = experiment_delay_fun(&instruction_exec_status);
 						break;
 						
-						case EXPERIMENT_INSTRUCT_FINISH:
+						case INSTRUCT_FINISH:
 						    experiment_status = STATUS_EXPERIMENT_FINISH;
 							instruction_exec_status = INSTRUCTION_EXEC_END;
 							cur_instruct_index = 0;
