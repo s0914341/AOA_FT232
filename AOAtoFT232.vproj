@@ -978,10 +978,6 @@
 	
 	
 	
-	
-	
-	
-	
 	<OpenFilesList>
 		<filename>AOAtoFT232.c</filename>
 		<actvieTabIndex>0</actvieTabIndex>
@@ -997,23 +993,7 @@
 	</OpenFilesList>
 	<BreakPointList>
 		<filename>AOAtoFT232.c</filename>
-		<lineNo>863</lineNo>
+		<lineNo>673</lineNo>
 		<isEnabled>true</isEnabled>
 	</BreakPointList>
-	<WatchVariableList>
-		<WatchVarName>delay_count</WatchVarName>
-		<DisplayType>2</DisplayType>
-	</WatchVariableList>
-	<WatchVariableList>
-		<WatchVarName>instruct</WatchVarName>
-		<DisplayType>2</DisplayType>
-	</WatchVariableList>
-	<WatchVariableList>
-		<WatchVarName>instruction_exec_status</WatchVarName>
-		<DisplayType>2</DisplayType>
-	</WatchVariableList>
-	<WatchVariableList>
-		<WatchVarName>gstAccPacketWrite</WatchVarName>
-		<DisplayType>2</DisplayType>
-	</WatchVariableList>
 </Project>

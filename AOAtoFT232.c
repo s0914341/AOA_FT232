@@ -76,6 +76,8 @@ const char *shaker_off = "OF ";
 const char *shaker_speed = "SS0";
 const char *shaker_temperature = "SC";
 const char *shaker_end = "0 ";
+const char *experiment_data_file = "raw.txt";
+const char *script_file = "Script.txt";
 
 /*accessory packet*/
 #define SHAKER_BUFFER_SIZE   64
@@ -83,6 +85,7 @@ uint8 shaker_buffer[SHAKER_BUFFER_SIZE];
 uint8 shaker_buffer_start;
 uint8 shaker_data_size;
 uint8 experiment_status;
+
 //android_accessory_packet gstAccPacketWriteSensor;
 android_accessory_packet gstAccPacketWrite;
 android_accessory_packet gstAccPacketRead;
@@ -166,7 +169,7 @@ void main(void)
 	experiment_status = 0;
 	/* Create threads */
 	tcbANDROID_RECEIVER = vos_create_thread_ex(24, 2048, android_receiver, "android_receiver", 0);
-	tcbSHAKER_RECEIVER = vos_create_thread_ex(24, 1024, shaker_receiver, "shaker_receiver", 0);
+	//tcbSHAKER_RECEIVER = vos_create_thread_ex(24, 1024, shaker_receiver, "shaker_receiver", 0);
 	tcbEXPERIMENT_TASK = vos_create_thread_ex(24, 2048, experiment_task, "experiment_task", 0);
 	/* timer tick thread */
     tcbTIMER_TICK = vos_create_thread_ex(24, 1024, timer_tick, "timer_tick", 0);
@@ -274,8 +277,7 @@ void boms_detach(VOS_HANDLE hBOMS)
 {
 	msi_ioctl_cb_t boms_iocb;
 
-	if (hBOMS)
-	{
+	if (hBOMS) {
 		boms_iocb.ioctl_code = MSI_IOCTL_BOMS_DETACH;
 		boms_iocb.set = NULL;
 		boms_iocb.get = NULL;
@@ -559,6 +561,31 @@ void shaker_receiver()
 	Comments:
 	This thread reads data from the Android device on USB1 and copies it to the FT232 on USB2
 */	
+uint8 write_sensor_data_to_file(unsigned char *buf, unsigned short len)
+{
+	FILE *file;
+	uint8 ret = 0;
+
+    // now call the stdio runtime functions
+	file = fopen(experiment_data_file, "a+");
+
+	if (file == NULL) {
+		ret |= ERR_OPEN_FILE_FAIL;
+		return ret;
+	}
+
+	if (fwrite(buf, len, sizeof(char), file) == -1) {
+		ret |= ERR_WRITE_FILE_FAIL;
+	}
+
+	if (fclose(file) == -1) {
+		ret |= ERR_CLOSE_FILE_FAIL;
+		return ret;
+	}
+
+	return ret;
+}
+
 uint8 write_data_to_shaker(uint8 *data, uint8 data_len, uint16 *actualw)
 {	
 	uint8 status = 1;
@@ -603,10 +630,10 @@ uint8 set_experiment_script(android_accessory_packet *packet)
     // now call the stdio runtime functions
 	
 	if (packet->u8Status == STATUS_START) {
-	    remove("Script.txt");
+	    remove(script_file);
 	}
 	
-	file = fopen("Script.txt", "a+");
+	file = fopen(script_file, "a+");
 
 	if (file == NULL) {
 		ret |= ERR_OPEN_FILE_FAIL;
@@ -639,11 +666,29 @@ uint8 set_experiment_status(uint8 *data, uint8 data_len)
 {
 	uint8 status, write_len;
 	unsigned short actualw = 0;
-	
+	char time_buffer[8*3+9];
+	int size = 0;
+
+	if (gstAccPacketRead.u8len == 9) {
+	    if (STATUS_EXPERIMENT_START == data[0]) {
+		    remove(experiment_data_file);
+
+		    /* first write start time to file */
+			memset(time_buffer, 0, sizeof(time_buffer));
+		    sprintf(time_buffer,"%d/%d/%d/%d/%d/%d/%d/%d\n",
+		    data[1],data[2],data[3],data[4],data[5],
+		    data[6],data[7],data[8]);
+			for (size = 0; size < sizeof(time_buffer); size++) {
+                if (time_buffer[size] == '\n')
+					break;
+			}
+		    write_sensor_data_to_file(time_buffer, (unsigned short)(size+1));
+	    }
+	}
+	experiment_status = data[0];	
 	vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
 	gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
 	gstAccPacketWrite.u8Type = gstAccPacketRead.u8Type;
-	experiment_status = data[0];
 	gstAccPacketWrite.u8Status = STATUS_OK;
 	gstAccPacketWrite.u8len = 0;
 	write_len = HEADER_SIZE + gstAccPacketWrite.u8len;
@@ -663,7 +708,7 @@ uint8 get_experiment_data(uint8 *data, uint8 data_len)
 	uint8 ret = 0;
 
     // now call the stdio runtime functions
-	file = fopen("ExpData.txt", "r");
+	file = fopen(experiment_data_file, "r");
 
 	if (file == NULL) {
 		ret |= ERR_OPEN_FILE_FAIL;
@@ -924,7 +969,7 @@ uint8 check_experiment_script(uint32 *instruction, uint8 *exec_status, uint32 *c
 	script_instruction instruct;
 	
 	if (INSTRUCTION_EXEC_END == (*exec_status)) {
-	    file = fopen("Script.txt", "r");
+	    file = fopen(script_file, "r");
 	
 	    if (file == NULL) {
 		    ret |= ERR_OPEN_FILE_FAIL;
@@ -959,31 +1004,6 @@ uint8 check_experiment_script(uint32 *instruction, uint8 *exec_status, uint32 *c
 	return ret;
 }
 	
-uint8 write_sensor_data_to_file(unsigned char *buf, unsigned short len)
-{
-	FILE *file;
-	uint8 ret = 0;
-
-    // now call the stdio runtime functions
-	file = fopen("ExpData.txt", "a+");
-
-	if (file == NULL) {
-		ret |= ERR_OPEN_FILE_FAIL;
-		return ret;
-	}
-
-	if (fwrite(buf, len, sizeof(char), file) == -1) {
-		ret |= ERR_WRITE_FILE_FAIL;
-	}
-
-	if (fclose(file) == -1) {
-		ret |= ERR_CLOSE_FILE_FAIL;
-		return ret;
-	}
-
-	return ret;
-}
-	
 void notify_android_receive_sensor_data(unsigned char *buf, unsigned short len)
 {
 	unsigned short actualw;
@@ -1005,7 +1025,7 @@ void notify_android_receive_sensor_data(unsigned char *buf, unsigned short len)
 #define ERR_READ_SENSOR_TIMEOUT         (1)	
 #define ERR_READ_SENSOR_DATA_NOMATCH    (2)	
 
-uint8 read_sensor_data(uint8 *exec_status)
+uint8 read_sensor_data(uint8 *exec_status, uint32 cur_instruct_index)
 {
 	common_ioctl_cb_t uart_iocb;
 	char *tx_sensor = "Request OD data\r";
@@ -1130,7 +1150,7 @@ void experiment_task()
 				if (0 == check_experiment_script(&experiment_instruction, &instruction_exec_status, &cur_instruct_index, &cur_loop_count)) {
 					switch(experiment_instruction) {
 						case INSTRUCT_READ_SENSOR:
-						    ret = read_sensor_data(&instruction_exec_status);
+						    ret = read_sensor_data(&instruction_exec_status, cur_instruct_index);
 						break;
 						
 						case INSTRUCT_SHAKER_ON:
@@ -1171,6 +1191,8 @@ void experiment_task()
 						default:
 						break;
 					}
+				} else {
+                    experiment_status = STATUS_EXPERIMENT_STOP;
 				}
 			}
 	    }
