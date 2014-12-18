@@ -168,5 +168,11 @@ typedef struct {
 	uint32 arg1;
 	uint32 arg2;
 } script_instruction;
+
+typedef struct {
+	uint32 cur_instruct_index;
+	uint32 repeat_instruct;
+	uint32 arg2;
+} running_exec;
 		
 #endif /* _AOAtoFT232_H_ */

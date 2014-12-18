@@ -973,12 +973,7 @@
 		<fileType>4</fileType>
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000006}</VirtualFolder>
-	</LibraryFiles>	
-	
-	
-	
-	
-	<OpenFilesList>
+	</LibraryFiles>	<OpenFilesList>
 		<filename>AOAtoFT232.c</filename>
 		<actvieTabIndex>0</actvieTabIndex>
 	</OpenFilesList>
@@ -993,7 +988,21 @@
 	</OpenFilesList>
 	<BreakPointList>
 		<filename>AOAtoFT232.c</filename>
-		<lineNo>673</lineNo>
+		<lineNo>1214</lineNo>
 		<isEnabled>true</isEnabled>
 	</BreakPointList>
+	<BreakPointList>
+		<filename>AOAtoFT232.c</filename>
+		<lineNo>1058</lineNo>
+		<isEnabled>true</isEnabled>
+	</BreakPointList>
+	<BreakPointList>
+		<filename>AOAtoFT232.c</filename>
+		<lineNo>1086</lineNo>
+		<isEnabled>true</isEnabled>
+	</BreakPointList>
+	<WatchVariableList>
+		<WatchVarName>buffer</WatchVarName>
+		<DisplayType>2</DisplayType>
+	</WatchVariableList>
 </Project>

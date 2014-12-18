@@ -21,6 +21,8 @@
 
 #include "AOAtoFT232.h"
 
+#define SENSOR_SIMULATE
+
 vos_tcb_t *tcbANDROID_RECEIVER;
 vos_tcb_t *tcbSHAKER_RECEIVER;
 vos_tcb_t *tcbEXPERIMENT_TASK;
@@ -69,7 +71,7 @@ unsigned char ft232Flow = USBHOSTFT232_FLOW_NONE;
 unsigned char device_connect_status = 0;
 
 uint8 delay_count = 0;
-uint8 experiment_delay = 0;
+uint32 experiment_delay = 0;
 
 const char *shaker_on = "ON ";
 const char *shaker_off = "OF ";
@@ -438,7 +440,7 @@ void timer_tick() {
 	vos_dev_ioctl(hTimer, &tmr_iocb);
 
 	tmr_iocb.ioctl_code = VOS_IOCTL_TIMER_SET_COUNT;
-	tmr_iocb.param = 500;                        // 500ms
+	tmr_iocb.param = 1000;                        // 500ms
 	vos_dev_ioctl(hTimer, &tmr_iocb);
 
 	tmr_iocb.ioctl_code = VOS_IOCTL_TIMER_SET_DIRECTION;
@@ -515,6 +517,7 @@ void shaker_receiver()
 			    vos_dev_ioctl(hUSBHOST_FT232, &ft232_iocb);
 				machine_info.shaker_status = STATUS_SHAKER_READY;
 				while (device_connect_status&CONNECTED_FT232) {
+#if 0
 					ft232_iocb.ioctl_code = VOS_IOCTL_COMMON_GET_RX_QUEUE_STATUS;					// check whether any data is 
 		            status = vos_dev_ioctl(hUSBHOST_FT232, &ft232_iocb);							// available at from the FT232
 		            dataAvail = ft232_iocb.get.queue_stat;
@@ -537,7 +540,7 @@ void shaker_receiver()
 						    shaker_data_size += actual;
 					    }
 		            }
-					
+#endif		
 					if (!usbhost_connect_state(hUSBHOST2)) {
 						device_connect_status &= ~CONNECTED_FT232;
 						machine_info.shaker_status = STATUS_SHAKER_NOT_READY;
@@ -584,6 +587,28 @@ uint8 write_sensor_data_to_file(unsigned char *buf, unsigned short len)
 	}
 
 	return ret;
+}
+
+uint8 read_data_from_shaker(uint8 *data, uint8 max_len, uint16 *actualw)
+{	
+	uint8 status = 1;
+	common_ioctl_cb_t ft232_iocb;
+	uint16 dataAvail = 0;
+
+    if (hUSBHOST_FT232 != NULL) {
+        ft232_iocb.ioctl_code = VOS_IOCTL_COMMON_GET_RX_QUEUE_STATUS;					// check whether any data is 
+        status = vos_dev_ioctl(hUSBHOST_FT232, &ft232_iocb);							// available at from the FT232
+        dataAvail = ft232_iocb.get.queue_stat;
+
+        if (dataAvail > max_len) {				// If there is more data than the buffer size.
+	        dataAvail = max_len; 				// ... then limit the number of bytes to the buffer size
+        }
+					
+	    if (dataAvail > 0) 								                            // If there is any data available
+	        status = vos_dev_read(hUSBHOST_FT232, data, dataAvail, actualw); 		// read from FT232 device
+	}
+		
+	return status;
 }
 
 uint8 write_data_to_shaker(uint8 *data, uint8 data_len, uint16 *actualw)
@@ -746,7 +771,7 @@ uint8 get_experiment_data(uint8 *data, uint8 data_len)
 	return status;	
 }
 	
-uint8 send_shaker_command(uint8 *data, uint8 data_len)
+uint8 manual_send_shaker_command(uint8 *data, uint8 data_len)
 {
 	uint8 status, write_len;
 	uint16 actualw = 0;
@@ -854,7 +879,7 @@ void android_receiver()
 									break;
 									
 									case DATA_TYPE_SEND_SHAKER_COMMAND:
-									    write_len = send_shaker_command(gstAccPacketRead.u8Data, gstAccPacketRead.u8len);
+									    write_len = manual_send_shaker_command(gstAccPacketRead.u8Data, gstAccPacketRead.u8len);
 									break;
 									
 									case DATA_TYPE_GET_SHAKER_RETURN:
@@ -961,13 +986,12 @@ uint8 check_mass_storage_status(uint8 *status)
 #define INSTRUCTION_EXEC_RUNNING    2
 #define INSTRUCTION_EXEC_END        3
 	
-uint8 check_experiment_script(uint32 *instruction, uint8 *exec_status, uint32 *cur_instruct_index, uint32 *cur_loop_count)
+uint8 check_experiment_script(script_instruction *instruct, uint8 *exec_status, uint32 *cur_instruct_index, uint32 *cur_loop_count)
 {
 	FILE *file;
 	uint8 ret = 0;
 	experiment_script_header header;
-	script_instruction instruct;
-	
+
 	if (INSTRUCTION_EXEC_END == (*exec_status)) {
 	    file = fopen(script_file, "r");
 	
@@ -976,22 +1000,22 @@ uint8 check_experiment_script(uint32 *instruction, uint8 *exec_status, uint32 *c
 		    return ret;
 	    }
 		
-		fread(&header, sizeof(header), 1, file);
+		fread(&header, sizeof(experiment_script_header), 1, file);
 		//(*cur_instruct_index)++;
-		fseek(file, (*cur_instruct_index)*sizeof(instruct), SEEK_CUR);
-		fread(&instruct, sizeof(instruct), 1, file);
-	    if (INSTRUCT_REPEAT_COUNT == instruct.instruct_type) {
-			if ((*cur_loop_count) == instruct.arg1) {
-		        fread(&instruct, sizeof(instruct), 1, file);
+		fseek(file, (*cur_instruct_index)*sizeof(script_instruction), SEEK_CUR);
+		fread(instruct, sizeof(script_instruction), 1, file);
+	    if (INSTRUCT_REPEAT_COUNT == instruct->instruct_type) {
+			if ((*cur_loop_count) == instruct->arg1) {
+		        fread(instruct, sizeof(script_instruction), 1, file);
 				(*cur_loop_count) = 0;
 			} else {
-		        fseek(file, (instruct.arg2)*sizeof(instruct) + sizeof(header), SEEK_SET);
-		        fread(&instruct, sizeof(instruct), 1, file);
+		        fseek(file, (instruct->arg2)*sizeof(script_instruction) + sizeof(experiment_script_header), SEEK_SET);
+		        fread(instruct, sizeof(script_instruction), 1, file);
 				(*cur_loop_count)++;
 			}
 		}
-		*cur_instruct_index = instruct.instruct_index;
-		*instruction = instruct.instruct_type;
+        *cur_instruct_index = instruct->instruct_index;
+		
 	
 	    if (fclose(file) == -1) {
 		    ret |= ERR_CLOSE_FILE_FAIL;
@@ -1025,7 +1049,7 @@ void notify_android_receive_sensor_data(unsigned char *buf, unsigned short len)
 #define ERR_READ_SENSOR_TIMEOUT         (1)	
 #define ERR_READ_SENSOR_DATA_NOMATCH    (2)	
 
-uint8 read_sensor_data(uint8 *exec_status, uint32 cur_instruct_index)
+uint8 read_sensor_data(uint8 *exec_status)
 {
 	common_ioctl_cb_t uart_iocb;
 	char *tx_sensor = "Request OD data\r";
@@ -1039,17 +1063,26 @@ uint8 read_sensor_data(uint8 *exec_status, uint32 cur_instruct_index)
 		offset = 0;
 		(*exec_status) = INSTRUCTION_EXEC_RUNNING;
 	} else {
+#ifndef SENSOR_SIMULATE
 		uart_iocb.ioctl_code = VOS_IOCTL_COMMON_GET_RX_QUEUE_STATUS;
 		vos_dev_ioctl(hUART, &uart_iocb);
 		dataAvail = uart_iocb.get.queue_stat;
+#else
+        dataAvail = 66;
+#endif
 
 		if (dataAvail > 0) {
 		    if (dataAvail > sizeof(buffer)) {
 			    dataAvail = sizeof(buffer);
 			}
+#ifndef SENSOR_SIMULATE
 			// read from UART
 			status = vos_dev_read(hUART, &buffer[offset], dataAvail, &actual);
 			offset += actual;
+#else
+            offset = dataAvail;
+            memcpy(buffer, "index: 597, 0704,  0702,  0698,  0698,  0694,  0694,  0692,  0693\r", offset);
+#endif
 			
 			/* check head is "index", end is '\r' */
 			if (buffer[offset-1] == '\r') {
@@ -1080,16 +1113,47 @@ uint8 read_sensor_data(uint8 *exec_status, uint32 cur_instruct_index)
 	return ret;
 }
 	
-uint8 experiment_delay_fun(uint8 *exec_status)
+uint8 experiment_delay_function(script_instruction *experiment_instruction, uint8 *exec_status)
 {
 	uint8 ret = 0;
-	
-	if (0 == experiment_delay)
+
+    if (INSTRUCTION_EXEC_START == (*exec_status)) {
+		experiment_delay = experiment_instruction->arg1;
+		(*exec_status) = INSTRUCTION_EXEC_RUNNING;
+	} else if (0 == experiment_delay) {
 	    (*exec_status) = INSTRUCTION_EXEC_END;
-	else
-	    (*exec_status) = INSTRUCTION_EXEC_RUNNING;
+	}
 		
     return ret;
+}
+
+uint8 send_shaker_command(uint8 *cmd, uint8 cmd_len)
+{
+    uint16 actualw, actualr;
+    uint8 i = 0;
+	uint8 compare_result = TRUE;
+	uint8 buffer[16];
+	uint8 ret = 0;
+	
+    do {
+	    ret = write_data_to_shaker(cmd, cmd_len, &actualw);
+		ret = read_data_from_shaker(buffer, 16, &actualr);
+
+        compare_result = TRUE;
+		if (actualr == cmd_len) {
+		    for (i = 0; i < actualr; i++) {
+			    if (buffer[i] != cmd[i]) {
+			        compare_result = FALSE;
+				    break;
+			    }		
+		    }	
+	    } else {
+	        compare_result = FALSE;
+	    }
+		/* need timeout exception */
+	} while (FALSE == compare_result);
+
+	return ret;
 }
 /*
 	Thread Name:  uart_sensor()
@@ -1100,9 +1164,12 @@ void experiment_task()
 {
 	common_ioctl_cb_t uart_iocb;
 	uint8 ret = 0;
-	uint16 actualw;
-	uint8 experiment_instruction = 0, instruction_exec_status = INSTRUCTION_EXEC_END;
-	uint8 cur_instruct_index = 0, cur_loop_count = 0;
+	uint16 actualw, actualr;
+	uint8 instruction_exec_status = INSTRUCTION_EXEC_END;
+	uint32 cur_loop_count = 0;
+	uint32 cur_instruct_index = 0;
+	script_instruction experiment_instruction;
+	uint8 buffer[6];
 
 	
 	/* UART ioctl call to enable DMA and link to DMA driver */
@@ -1148,27 +1215,33 @@ void experiment_task()
 	    if (0 == check_mass_storage_status(&machine_info.mass_storage_status)) {
 			if ((STATUS_EXPERIMENT_START == experiment_status) || (STATUS_EXPERIMENT_RUNNING == experiment_status)) {
 				if (0 == check_experiment_script(&experiment_instruction, &instruction_exec_status, &cur_instruct_index, &cur_loop_count)) {
-					switch(experiment_instruction) {
+					switch(experiment_instruction.instruct_type) {
 						case INSTRUCT_READ_SENSOR:
-						    ret = read_sensor_data(&instruction_exec_status, cur_instruct_index);
+						    ret = read_sensor_data(&instruction_exec_status);
 						break;
 						
 						case INSTRUCT_SHAKER_ON:
-						    ret = write_data_to_shaker(shaker_on, sizeof(shaker_on), &actualw);
+							ret = send_shaker_command(shaker_on, sizeof(shaker_on));
 						break;
 						
 						case INSTRUCT_SHAKER_OFF:
-						    ret = write_data_to_shaker(shaker_off, sizeof(shaker_off), &actualw);
+							ret = send_shaker_command(shaker_off, sizeof(shaker_off));
 						break;
 						
 						case INSTRUCT_SHAKER_SET_TEMPERATURE:
-						    ret = write_data_to_shaker(shaker_temperature, sizeof(shaker_temperature), &actualw);
-							ret = write_data_to_shaker(shaker_end, sizeof(shaker_end), &actualw);
+							ret = send_shaker_command(shaker_temperature, sizeof(shaker_temperature));
+			                memset(buffer, 0, sizeof(buffer));
+		                    sprintf(buffer,"%02d", experiment_instruction.arg1);
+							ret = send_shaker_command(buffer, 2);
+							ret = send_shaker_command(shaker_end, sizeof(shaker_end));
 						break;
 						
 						case INSTRUCT_SHAKER_SET_SPEED:
-						    ret = write_data_to_shaker(shaker_speed, sizeof(shaker_speed), &actualw);
-							ret = write_data_to_shaker(shaker_end, sizeof(shaker_end), &actualw);
+							ret = send_shaker_command(shaker_speed, sizeof(shaker_speed));
+							memset(buffer, 0, sizeof(buffer));
+		                    sprintf(buffer,"%03d", experiment_instruction.arg1);
+							ret = send_shaker_command(buffer, 3);
+							ret = send_shaker_command(shaker_end, sizeof(shaker_end));
 						break;
 						
 						case INSTRUCT_REPEAT_COUNT:
@@ -1178,7 +1251,7 @@ void experiment_task()
 						break;
 
 						case INSTRUCT_DELAY:
-						    ret = experiment_delay_fun(&instruction_exec_status);
+						    ret = experiment_delay_function(&experiment_instruction, &instruction_exec_status);
 						break;
 						
 						case INSTRUCT_FINISH:
