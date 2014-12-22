@@ -5,6 +5,10 @@
 .WEAK	"%eax"
 .WEAK	"%ebx"
 .WEAK	"%ecx"
+.WEAK	"%r0"
+.WEAK	"%r1"
+.WEAK	"%r2"
+.WEAK	"%r3"
 
 
 .ENUM	"IOMUX_SIGNALS"
@@ -931,22 +935,20 @@
 iomux_setup:	
 .GLOBAL	 DO_NOT_EXPORT  "iomux_setup"
 
-.VARIABLE	"packageType"	8	"char"	0	0	1	0	0	0	28	
 .FUNCTION	"iomux_setup"	
-.RETURN "void"	0	0	0	27	0	0	0	
-SP_DEC	$24
+.RETURN "void"	0	0	0	26	0	0	0	
+PUSH32	%r0
+SP_DEC	$23
 .LINE	30
 SP_DEC	$1
 CALL	vos_get_package_type
 POP8	%eax
 SP_WR8	%eax	$0
 SP_STORE	%eax
-CPY8	%ecx	(%eax)
-SP_WR8	%ecx	$1
+CPY8	%r0	(%eax)
 .LINE	31
-SP_RD8	%ecx	$1
+SP_RD8	%ecx	$0
 CMP8	%ecx	$0
-JZ	@IC2
 JNZ	@IC1
 @IC2:	
 .LINE	34
@@ -956,7 +958,7 @@ PUSH8	$199
 SP_DEC	$1
 CALL	vos_iomux_define_bidi
 POP8	%eax
-SP_WR8	%eax	$5
+SP_WR8	%eax	$4
 SP_INC	$3
 .LINE	36
 PUSH8	$97
@@ -964,7 +966,7 @@ PUSH8	$30
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$5
+SP_WR8	%eax	$4
 SP_INC	$2
 .LINE	38
 PUSH8	$98
@@ -972,7 +974,7 @@ PUSH8	$31
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$6
+SP_WR8	%eax	$5
 SP_INC	$2
 .LINE	40
 PUSH8	$99
@@ -980,13 +982,11 @@ PUSH8	$32
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$7
+SP_WR8	%eax	$6
 SP_INC	$2
 @IC1:	
 .LINE	43
-SP_RD8	%ecx	$1
-CMP8	%ecx	$1
-JZ	@IC6
+CMP8	%r0	$1
 JNZ	@IC5
 @IC6:	
 .LINE	46
@@ -996,7 +996,7 @@ PUSH8	$199
 SP_DEC	$1
 CALL	vos_iomux_define_bidi
 POP8	%eax
-SP_WR8	%eax	$9
+SP_WR8	%eax	$8
 SP_INC	$3
 .LINE	48
 PUSH8	$97
@@ -1004,7 +1004,7 @@ PUSH8	$16
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$9
+SP_WR8	%eax	$8
 SP_INC	$2
 .LINE	50
 PUSH8	$98
@@ -1012,7 +1012,7 @@ PUSH8	$18
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$10
+SP_WR8	%eax	$9
 SP_INC	$2
 .LINE	52
 PUSH8	$99
@@ -1020,13 +1020,11 @@ PUSH8	$19
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$11
+SP_WR8	%eax	$10
 SP_INC	$2
 @IC5:	
 .LINE	55
-SP_RD8	%ecx	$1
-CMP8	%ecx	$2
-JZ	@IC10
+CMP8	%r0	$2
 JNZ	@IC9
 @IC10:	
 .LINE	58
@@ -1036,7 +1034,7 @@ PUSH8	$199
 SP_DEC	$1
 CALL	vos_iomux_define_bidi
 POP8	%eax
-SP_WR8	%eax	$13
+SP_WR8	%eax	$12
 SP_INC	$3
 .LINE	60
 PUSH8	$97
@@ -1044,7 +1042,7 @@ PUSH8	$52
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$13
+SP_WR8	%eax	$12
 SP_INC	$2
 .LINE	62
 PUSH8	$98
@@ -1052,7 +1050,7 @@ PUSH8	$55
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$14
+SP_WR8	%eax	$13
 SP_INC	$2
 .LINE	64
 PUSH8	$99
@@ -1060,7 +1058,7 @@ PUSH8	$56
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$15
+SP_WR8	%eax	$14
 SP_INC	$2
 .LINE	66
 PUSH8	$107
@@ -1068,7 +1066,7 @@ PUSH8	$64
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$16
+SP_WR8	%eax	$15
 SP_INC	$2
 .LINE	68
 PUSH8	$0
@@ -1079,7 +1077,7 @@ PUSH8	$64
 SP_DEC	$1
 CALL	vos_iocell_set_config
 POP8	%eax
-SP_WR8	%eax	$20
+SP_WR8	%eax	$19
 SP_INC	$5
 .LINE	75
 PUSH8	$108
@@ -1087,7 +1085,7 @@ PUSH8	$61
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$18
+SP_WR8	%eax	$17
 SP_INC	$2
 .LINE	77
 PUSH8	$0
@@ -1098,7 +1096,7 @@ PUSH8	$61
 SP_DEC	$1
 CALL	vos_iocell_set_config
 POP8	%eax
-SP_WR8	%eax	$22
+SP_WR8	%eax	$21
 SP_INC	$5
 .LINE	79
 PUSH8	$109
@@ -1106,7 +1104,7 @@ PUSH8	$62
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$20
+SP_WR8	%eax	$19
 SP_INC	$2
 .LINE	81
 PUSH8	$0
@@ -1117,7 +1115,7 @@ PUSH8	$62
 SP_DEC	$1
 CALL	vos_iocell_set_config
 POP8	%eax
-SP_WR8	%eax	$24
+SP_WR8	%eax	$23
 SP_INC	$5
 .LINE	83
 PUSH8	$110
@@ -1125,7 +1123,7 @@ PUSH8	$63
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$22
+SP_WR8	%eax	$21
 SP_INC	$2
 .LINE	85
 PUSH8	$0
@@ -1136,7 +1134,7 @@ PUSH8	$63
 SP_DEC	$1
 CALL	vos_iocell_set_config
 POP8	%eax
-SP_WR8	%eax	$26
+SP_WR8	%eax	$25
 SP_INC	$5
 .LINE	89
 PUSH8	$65
@@ -1144,7 +1142,7 @@ PUSH8	$39
 SP_DEC	$1
 CALL	vos_iomux_define_output
 POP8	%eax
-SP_WR8	%eax	$24
+SP_WR8	%eax	$23
 SP_INC	$2
 .LINE	91
 PUSH8	$1
@@ -1152,11 +1150,12 @@ PUSH8	$40
 SP_DEC	$1
 CALL	vos_iomux_define_input
 POP8	%eax
-SP_WR8	%eax	$25
+SP_WR8	%eax	$24
 SP_INC	$2
 @IC9:	
 .LINE	91
-SP_INC	$24
+SP_INC	$23
+POP32	%r0
 RTS	
 .FUNC_END	"iomux_setup"
 

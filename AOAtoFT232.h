@@ -162,6 +162,8 @@ INSTRUCT_FINISH,
 TOTAL_INSTRUCT_TYPE
 };
 
+#define MAX_REPEAT_LEVEL    3
+
 typedef struct {
 	uint32 instruct_index;
 	uint32 instruct_type;
@@ -170,9 +172,18 @@ typedef struct {
 } script_instruction;
 
 typedef struct {
-	uint32 cur_instruct_index;
-	uint32 repeat_instruct;
-	uint32 arg2;
+	uint32 repeat_instruct_index;
+	uint32 repeat_instruct_from;
+	uint32 repeat_argument;
+} repeat_info;
+
+typedef struct {
+	uint32 current_instruct_index;
+	uint32 next_instruct_index;
+	uint8 instruction_exec_status;
+	script_instruction script;
+	repeat_info repeat_count[MAX_REPEAT_LEVEL];
+	repeat_info repeat_time[MAX_REPEAT_LEVEL];
 } running_exec;
 		
 #endif /* _AOAtoFT232_H_ */

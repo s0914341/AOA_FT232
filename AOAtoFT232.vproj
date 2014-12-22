@@ -12,7 +12,7 @@
 		<CompilerOptions>
 			<KeepFiles>Default</KeepFiles>
 			<DebugLevel>1</DebugLevel>
-			<OptimizeLevel>0</OptimizeLevel>
+			<OptimizeLevel>4</OptimizeLevel>
 			<OptionalMacros></OptionalMacros>
 			<MaxError></MaxError>
 			<MaxWarning></MaxWarning>
@@ -38,8 +38,8 @@
 	<ReleaseMode>
 		<CompilerOptions>
 			<KeepFiles>Default</KeepFiles>
-			<DebugLevel>0</DebugLevel>
-			<OptimizeLevel>0</OptimizeLevel>
+			<DebugLevel>1</DebugLevel>
+			<OptimizeLevel>4</OptimizeLevel>
 			<OptionalMacros></OptionalMacros>
 			<MaxError></MaxError>
 			<MaxWarning></MaxWarning>
@@ -671,12 +671,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder></VirtualFolder>
 	</Files>
-	<BuildList>
-		<filename>AOAtoFT232.c</filename>
-	</BuildList>
-	<BuildList>
-		<filename>AOAtoFT232_iomux.c</filename>
-	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>kernel.a</filename>
@@ -694,9 +688,6 @@
 		<ID>{00000000-0000-0000-0000-000000000007}</ID>
 		<ParentID>{00000000-0000-0000-0000-000000000003}</ParentID>
 	</VirtualFolderGroup>
-	<BuildList>
-		<filename>kernel.a</filename>
-	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>USBHostFT232.a</filename>
@@ -709,9 +700,6 @@
 		<ID>{00000000-0000-0000-0000-000000000008}</ID>
 		<ParentID>{00000000-0000-0000-0000-000000000003}</ParentID>
 	</VirtualFolderGroup>
-	<BuildList>
-		<filename>USBHostFT232.a</filename>
-	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>USBHostAndroidAccessory.a</filename>
@@ -719,9 +707,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	<BuildList>
-		<filename>USBHostAndroidAccessory.a</filename>
-	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>GPIO.a</filename>
@@ -729,9 +714,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	<BuildList>
-		<filename>GPIO.a</filename>
-	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>USBHost.a</filename>
@@ -739,9 +721,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	<BuildList>
-		<filename>USBHost.a</filename>
-	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>FAT.a</filename>
@@ -749,9 +728,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	<BuildList>
-		<filename>FAT.a</filename>
-	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>BOMS.a</filename>
@@ -759,9 +735,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	<BuildList>
-		<filename>BOMS.a</filename>
-	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>UART.a</filename>
@@ -769,9 +742,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	<BuildList>
-		<filename>UART.a</filename>
-	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>Timers.a</filename>
@@ -779,9 +749,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	<BuildList>
-		<filename>Timers.a</filename>
-	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>string.a</filename>
@@ -794,9 +761,6 @@
 		<ID>{00000000-0000-0000-0000-000000000009}</ID>
 		<ParentID>{00000000-0000-0000-0000-000000000003}</ParentID>
 	</VirtualFolderGroup>
-	<BuildList>
-		<filename>string.a</filename>
-	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>stdio.a</filename>
@@ -804,9 +768,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000009}</VirtualFolder>
 	</LibraryFiles>
-	<BuildList>
-		<filename>stdio.a</filename>
-	</BuildList>
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>vos.h</filename>
@@ -973,7 +934,49 @@
 		<fileType>4</fileType>
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000006}</VirtualFolder>
-	</LibraryFiles>	<OpenFilesList>
+	</LibraryFiles>
+	<ReflasherFile></ReflasherFile>
+	<SetProjectVersion>false</SetProjectVersion>
+	<IncludeReflasher>false</IncludeReflasher>	<BuildList>
+		<filename>AOAtoFT232.c</filename>
+	</BuildList>
+	<BuildList>
+		<filename>AOAtoFT232_iomux.c</filename>
+	</BuildList>
+	<BuildList>
+		<filename>kernel.a</filename>
+	</BuildList>
+	<BuildList>
+		<filename>USBHostFT232.a</filename>
+	</BuildList>
+	<BuildList>
+		<filename>USBHostAndroidAccessory.a</filename>
+	</BuildList>
+	<BuildList>
+		<filename>GPIO.a</filename>
+	</BuildList>
+	<BuildList>
+		<filename>USBHost.a</filename>
+	</BuildList>
+	<BuildList>
+		<filename>FAT.a</filename>
+	</BuildList>
+	<BuildList>
+		<filename>BOMS.a</filename>
+	</BuildList>
+	<BuildList>
+		<filename>UART.a</filename>
+	</BuildList>
+	<BuildList>
+		<filename>Timers.a</filename>
+	</BuildList>
+	<BuildList>
+		<filename>string.a</filename>
+	</BuildList>
+	<BuildList>
+		<filename>stdio.a</filename>
+	</BuildList>
+	<OpenFilesList>
 		<filename>AOAtoFT232.c</filename>
 		<actvieTabIndex>0</actvieTabIndex>
 	</OpenFilesList>
@@ -983,26 +986,9 @@
 	<OpenFilesList>
 		<filename>AOAtoFT232_iomux.c</filename>
 	</OpenFilesList>
-	<OpenFilesList>
-		<filename>stdio.h</filename>
-	</OpenFilesList>
 	<BreakPointList>
 		<filename>AOAtoFT232.c</filename>
-		<lineNo>1214</lineNo>
+		<lineNo>1005</lineNo>
 		<isEnabled>true</isEnabled>
 	</BreakPointList>
-	<BreakPointList>
-		<filename>AOAtoFT232.c</filename>
-		<lineNo>1058</lineNo>
-		<isEnabled>true</isEnabled>
-	</BreakPointList>
-	<BreakPointList>
-		<filename>AOAtoFT232.c</filename>
-		<lineNo>1086</lineNo>
-		<isEnabled>true</isEnabled>
-	</BreakPointList>
-	<WatchVariableList>
-		<WatchVarName>buffer</WatchVarName>
-		<DisplayType>2</DisplayType>
-	</WatchVariableList>
 </Project>
