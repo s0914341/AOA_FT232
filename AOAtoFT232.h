@@ -42,6 +42,7 @@
 #include "string.h"
 #include "time.h"
 #include "Timers.h"
+#include "FirmwareUpdate.h"
 /* FTDI:EHF */
 
 /* FTDI:SDC Driver Constants */
@@ -62,14 +63,15 @@
 /* FTDI:SXH Externs */
 /* FTDI:EXH */
 /* android tablet and VNC2 handshake command */
+#define REFLASHER_OFFSET 0x1F000
+
 #define ERR_OPEN_FILE_FAIL    (1<<0)
 #define ERR_WRITE_FILE_FAIL   (1<<1)
 #define ERR_READ_FILE_FAIL    (1<<2)
 #define ERR_CLOSE_FILE_FAIL   (1<<3)
 
 enum DATA_TYPE{
-DATA_TYPE_KEYPAD = 0,
-DATA_TYPE_GET_MACHINE_STATUS,
+DATA_TYPE_GET_MACHINE_STATUS = 0,
 DATA_TYPE_SEND_SHAKER_COMMAND,
 DATA_TYPE_GET_SHAKER_RETURN,
 DATA_TYPE_GET_EXPERIMENT_DATA,
@@ -132,10 +134,11 @@ typedef struct {
 	uint8 shaker_status;
 	uint8 sensor_status;
 	uint8 mass_storage_status;
-	uint8 spi_storage_status;
 	uint8 experiment_status;
-	uint8 experiment_progress;
 	uint8 synchronous_sensor_data;
+	uint32 current_instruction;
+	uint32 experiment_timer;
+	uint8 version[4];
 } machine_status;
 		
 #define CONNECTED_ANDROID    (1<<0)

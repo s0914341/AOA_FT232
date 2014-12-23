@@ -671,7 +671,9 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder></VirtualFolder>
 	</Files>
-	<LibraryFiles>
+	<ReflasherFile></ReflasherFile>
+	<SetProjectVersion>false</SetProjectVersion>
+	<IncludeReflasher>false</IncludeReflasher>	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>kernel.a</filename>
 		<fileType>3</fileType>
@@ -688,6 +690,7 @@
 		<ID>{00000000-0000-0000-0000-000000000007}</ID>
 		<ParentID>{00000000-0000-0000-0000-000000000003}</ParentID>
 	</VirtualFolderGroup>
+	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>USBHostFT232.a</filename>
@@ -700,6 +703,7 @@
 		<ID>{00000000-0000-0000-0000-000000000008}</ID>
 		<ParentID>{00000000-0000-0000-0000-000000000003}</ParentID>
 	</VirtualFolderGroup>
+	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>USBHostAndroidAccessory.a</filename>
@@ -707,6 +711,7 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
+	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>GPIO.a</filename>
@@ -714,6 +719,7 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
+	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>USBHost.a</filename>
@@ -721,6 +727,7 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
+	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>FAT.a</filename>
@@ -728,6 +735,7 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
+	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>BOMS.a</filename>
@@ -735,6 +743,7 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
+	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>UART.a</filename>
@@ -742,6 +751,7 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
+	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>Timers.a</filename>
@@ -749,6 +759,15 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
+	
+	<LibraryFiles>
+		<fileDir></fileDir>
+		<filename>FirmwareUpdateFATFile.a</filename>
+		<fileType>3</fileType>
+		<isFileDirty>false</isFileDirty>
+		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
+	</LibraryFiles>
+	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>string.a</filename>
@@ -761,6 +780,7 @@
 		<ID>{00000000-0000-0000-0000-000000000009}</ID>
 		<ParentID>{00000000-0000-0000-0000-000000000003}</ParentID>
 	</VirtualFolderGroup>
+	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>stdio.a</filename>
@@ -768,6 +788,10 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000009}</VirtualFolder>
 	</LibraryFiles>
+	
+	
+	
+	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>vos.h</filename>
@@ -904,6 +928,13 @@
 	</LibraryFiles>
 	<LibraryFiles>
 		<fileDir></fileDir>
+		<filename>FirmwareUpdate.h</filename>
+		<fileType>4</fileType>
+		<isFileDirty>false</isFileDirty>
+		<VirtualFolder>{00000000-0000-0000-0000-000000000005}</VirtualFolder>
+	</LibraryFiles>
+	<LibraryFiles>
+		<fileDir></fileDir>
 		<filename>errno.h</filename>
 		<fileType>4</fileType>
 		<isFileDirty>false</isFileDirty>
@@ -935,9 +966,29 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000006}</VirtualFolder>
 	</LibraryFiles>
-	<ReflasherFile></ReflasherFile>
-	<SetProjectVersion>false</SetProjectVersion>
-	<IncludeReflasher>false</IncludeReflasher>	<BuildList>
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	<BuildList>
 		<filename>AOAtoFT232.c</filename>
 	</BuildList>
 	<BuildList>
@@ -971,6 +1022,9 @@
 		<filename>Timers.a</filename>
 	</BuildList>
 	<BuildList>
+		<filename>FirmwareUpdateFATFile.a</filename>
+	</BuildList>
+	<BuildList>
 		<filename>string.a</filename>
 	</BuildList>
 	<BuildList>
@@ -986,9 +1040,7 @@
 	<OpenFilesList>
 		<filename>AOAtoFT232_iomux.c</filename>
 	</OpenFilesList>
-	<BreakPointList>
-		<filename>AOAtoFT232.c</filename>
-		<lineNo>1005</lineNo>
-		<isEnabled>true</isEnabled>
-	</BreakPointList>
+	<OpenFilesList>
+		<filename>FirmwareUpdate.h</filename>
+	</OpenFilesList>
 </Project>

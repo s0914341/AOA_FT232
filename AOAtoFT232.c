@@ -22,6 +22,9 @@
 #include "AOAtoFT232.h"
 
 #define SENSOR_SIMULATE
+#define SHAKER_SIMULATE
+
+const char *version = "001a";
 
 vos_tcb_t *tcbANDROID_RECEIVER;
 vos_tcb_t *tcbEXPERIMENT_TASK;
@@ -61,16 +64,13 @@ machine_status machine_info;
 #define DEF_FT232_STOP_BITS	USBHOSTFT232_STOP_BITS_1
 #define DEF_FT232_PARITY	USBHOSTFT232_PARITY_NONE
 
-unsigned int  ft232Baud = USBHOSTFT232_BAUD_38400;		// Set up default FT232 UART parameters
-unsigned char ft232Data = USBHOSTFT232_DATA_BITS_8;
-unsigned char ft232Stop = USBHOSTFT232_STOP_BITS_1;
-unsigned char ft232Parity = USBHOSTFT232_PARITY_NONE;
-unsigned char ft232Flow = USBHOSTFT232_FLOW_NONE;
 unsigned char device_connect_status = 0;
 
 uint8 delay_count = 0;
 uint32 experiment_delay = 0;
 
+const char *sensor_request = "Request OD data\r";
+const char *sensor_check = "Hello OD Monitor\r";
 const char *shaker_on = "ON ";
 const char *shaker_off = "OF ";
 const char *shaker_speed = "SS0";
@@ -84,9 +84,7 @@ const char *script_file = "Script.txt";
 uint8 shaker_buffer[SHAKER_BUFFER_SIZE];
 uint8 shaker_buffer_start;
 uint8 shaker_data_size;
-uint8 experiment_status;
 uint32 repeat_time[MAX_REPEAT_LEVEL];
-uint32 experiment_timer;
 
 //android_accessory_packet gstAccPacketWriteSensor;
 android_accessory_packet gstAccPacketWrite;
@@ -163,12 +161,12 @@ void main(void)
 	machine_info.shaker_status = STATUS_SHAKER_NOT_READY;
 	machine_info.sensor_status = STATUS_SENSOR_NOT_READY;
 	machine_info.mass_storage_status = STATUS_MASS_STORAGE_NOT_READY;
-	machine_info.spi_storage_status = STATUS_SPI_STORAGE_NOT_READY;
 	machine_info.experiment_status = STATUS_EXPERIMENT_IDLE;
-	machine_info.experiment_progress = 0;
+	machine_info.current_instruction = 0;
+	machine_info.experiment_timer = 0;
 	machine_info.synchronous_sensor_data = SYNCHRONOUS_NO_DATA;
+	memcpy(machine_info.version, version, sizeof(machine_info.version));
 
-	experiment_status = 0;
 	/* Create threads */
 	tcbANDROID_RECEIVER = vos_create_thread_ex(24, 2048, android_receiver, "android_receiver", 0);
 	tcbEXPERIMENT_TASK = vos_create_thread_ex(24, 2048, experiment_task, "experiment_task", 0);
@@ -469,7 +467,9 @@ void timer_tick() {
 	     if (experiment_delay > 0)
 		     experiment_delay--;
 
-		 experiment_timer++;
+         if ((machine_info.experiment_status == STATUS_EXPERIMENT_START) ||
+		 	 (machine_info.experiment_status == STATUS_EXPERIMENT_RUNNING))
+		     machine_info.experiment_timer++;
 	}
 }
 
@@ -600,6 +600,42 @@ uint8 set_experiment_script(android_accessory_packet *packet)
 	
 	return status;	
 }
+
+void do_firmware_update()
+{
+    FILE *file, *log_file;
+	uint8 status = 0;
+	char buffer[16];
+
+    // now call the stdio runtime functions
+	file = fopen("AOA.rom", "r");
+
+	if (file == NULL) {
+        return;		
+	} else {
+	    status = FirmwareUpdateFATFile(file, REFLASHER_OFFSET);
+		fclose(file);
+
+		log_file = fopen("log.txt", "a+");
+
+	    if (log_file == NULL) {
+		    return;
+	    }
+
+	    memset(buffer, 0, sizeof(buffer));
+		sprintf(buffer, "update: %d", status);
+		if (fwrite(buffer, sizeof(buffer), sizeof(uint8), log_file) == -1) {
+			return;
+		}
+
+	
+	    if (fclose(log_file) == -1) {
+		    return;
+	    }
+	}
+}
+
+
 	
 uint8 set_experiment_status(uint8 *data, uint8 data_len)
 {
@@ -624,8 +660,9 @@ uint8 set_experiment_status(uint8 *data, uint8 data_len)
 		    write_sensor_data_to_file(time_buffer, (unsigned short)(size+1));
 	    }
 	}
-	experiment_status = data[0];
-	experiment_timer = 0;
+	machine_info.experiment_status = data[0];
+	machine_info.experiment_timer = 0;
+
 	vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
 	gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
 	gstAccPacketWrite.u8Type = gstAccPacketRead.u8Type;
@@ -726,20 +763,6 @@ uint8 get_machine_status()
 	return status;	
 }
 
-#define LED_BUTTON_MAP	   	(0x78)
-unsigned char keypad(unsigned char key)
-{
-	uint8 u8Data;
-	
-	/*update the led bitmap*/
-	u8Data = (key << 3);
-    u8Data &= LED_BUTTON_MAP;
-	vos_dev_write(hGPIO_PORT_B,&u8Data, 1, NULL);
-	gstAccPacketWrite.u8Status = STATUS_OK;
-	gstAccPacketWrite.u8len = 0;
-    return (HEADER_SIZE + gstAccPacketWrite.u8len);	
-}
-
 void android_receiver()
 {
 	common_ioctl_cb_t aoa_iocb;
@@ -748,14 +771,14 @@ void android_receiver()
 	unsigned char numRead = 0;
 	unsigned char blink = 0;
 	gpio_ioctl_cb_t gpio_ioca;
-	char *manufacturer 	= "FTDI\0";						// Android Open Accessory ID strings
+	char *manufacturer 	= "Maestrogen\0";						// Android Open Accessory ID strings
 	//char *model 		= "FTDIUARTDemo\0";				// These need to match the strings
 	/* gibson 2014/11/12 */
-	char *model         = "FTDIDemoKit\0";
-	char *description 	= "Vinculum Accessory Test\0";	//  expected by the FTDI AOA HyperTerm
+	char *model         = "ODMonitor\0";
+	char *description 	= "ODMonitor Accessory Controller\0";	//  expected by the FTDI AOA HyperTerm
 	char *version 		= "1.0\0";						//  application on the Android device
 	char *uri 			= "http://www.ftdichip.com\0";
-	char *serial 		= "VinculumAccessory1\0";
+	char *serial 		= "ODMonitorAccessory\0";
 
     // Set all pins to output using an ioctl.
 	gpio_ioca.ioctl_code = VOS_IOCTL_GPIO_SET_MASK;
@@ -784,10 +807,6 @@ void android_receiver()
 		                        // process the message from the Android device
 								write_len = 0;
 								switch (gstAccPacketRead.u8Type) {
-									case DATA_TYPE_KEYPAD:
-										write_len = keypad(gstAccPacketRead.u8Data[0]);
-									break;
-									
 									case DATA_TYPE_GET_MACHINE_STATUS:
 										write_len = get_machine_status();
 									break;
@@ -827,23 +846,6 @@ void android_receiver()
 		    blink = !blink;
 		    vos_delay_msecs(100);
     	}
-		
-		
-		
-		//vos_lock_mutex(&mInitA);						// hold here until unlocked - lock then proceed
-		
-		// read a message from the Android device
-		// wrap this in the accessory driver read function
-		// NOTE: this call may return with less data than was requested
-		// In this case, we are requesting 64 bytes to fill our buffer,
-		// but our Android app will only send 1 byte!
-
-		// VOS_IOCTL_COMMON_GET_RX_QUEUE_STATUS is not a valid ioctl for Android Open Accessory mode
-		// Just let vos_dev_read block until some data comes in.
-		
-		//status = vos_dev_read(hANDROID_ACCESSORY, rAOAw232, sizeof(rAOAw232), &actual);	// read from Android device 
-		//status = vos_dev_write(hUSBHOST_FT232, rAOAw232, actual, &actualw);				// then write to the FT232
-		//vos_unlock_mutex(&mInitA);						// unlock the AOA mutex
 	}
 }
 #define ERR_USB_HOST_CONNECT_FAIL (1<<0)
@@ -851,9 +853,9 @@ void android_receiver()
 #define ERR_FAT_ATTACH_FAIL       (1<<2)
 #define ERR_FT232_ATTACH_FAIL     (1<<3)
 	
-uint8 check_mass_storage_status(uint8 *status)
+uint8 check_mass_storage_connect_status(uint8 *status)
 {
-	uint8 ret = 0;
+	uint8 ret = STATUS_OK;
 	
 	if (usbhost_connect_state(hUSBHOST2) == PORT_STATE_ENUMERATED) {
 		if (hBOMS == NULL) {
@@ -899,8 +901,13 @@ uint8 check_mass_storage_status(uint8 *status)
 	
 uint8 check_shaker_connect_status(uint8 *status)
 {
-	uint8 ret = 0;
+	uint8 ret = STATUS_OK;
 	common_ioctl_cb_t ft232_iocb;
+
+#ifdef SHAKER_SIMULATE
+    *status = STATUS_SHAKER_READY;
+    return ret;
+#endif
 	
 	if (usbhost_connect_state(hUSBHOST2) == PORT_STATE_ENUMERATED) {
 		if (hUSBHOST_FT232 == NULL) {
@@ -913,27 +920,27 @@ uint8 check_shaker_connect_status(uint8 *status)
 
 			 // FT232 set baud rate
 			 ft232_iocb.ioctl_code = VOS_IOCTL_USBHOSTFT232_SET_BAUD_RATE;
-			 ft232_iocb.set.uart_baud_rate = ft232Baud;
+			 ft232_iocb.set.uart_baud_rate = DEF_FT232_BAUD;
 			 vos_dev_ioctl(hUSBHOST_FT232, &ft232_iocb);
 
 			 // FT232 set flow control
 			 ft232_iocb.ioctl_code = VOS_IOCTL_USBHOSTFT232_SET_FLOW_CONTROL;
-			 ft232_iocb.set.param = USBHOSTFT232_FLOW_NONE;
+			 ft232_iocb.set.param = DEF_FT232_FLOW;
 			 vos_dev_ioctl(hUSBHOST_FT232, &ft232_iocb);
 
 			 // FT232 set data bits
 			 ft232_iocb.ioctl_code = VOS_IOCTL_USBHOSTFT232_SET_DATA_BITS;
-			 ft232_iocb.set.param = ft232Data;
+			 ft232_iocb.set.param = DEF_FT232_DATA_BITS;
 			 vos_dev_ioctl(hUSBHOST_FT232, &ft232_iocb);
 
 			 // FT232 set stop bits
 			 ft232_iocb.ioctl_code = VOS_IOCTL_USBHOSTFT232_SET_STOP_BITS;
-			 ft232_iocb.set.param = ft232Stop;
+			 ft232_iocb.set.param = DEF_FT232_STOP_BITS;
 			 vos_dev_ioctl(hUSBHOST_FT232, &ft232_iocb);
 
 			 // FT232 set parity
 			 ft232_iocb.ioctl_code = VOS_IOCTL_USBHOSTFT232_SET_PARITY;
-			 ft232_iocb.set.param = ft232Parity;
+			 ft232_iocb.set.param = DEF_FT232_PARITY;
 			 vos_dev_ioctl(hUSBHOST_FT232, &ft232_iocb);
 
 			 // start polling to ensure we receive data in the RX Queue
@@ -953,6 +960,51 @@ uint8 check_shaker_connect_status(uint8 *status)
 		*status = STATUS_SHAKER_NOT_READY;
 	    return ret;
 	}
+}
+
+uint8 check_sensor_connect_status(uint8 *status)
+{
+    uint8 ret = 1;
+    common_ioctl_cb_t uart_iocb;
+	unsigned short dataAvail, actual, offset;
+	uint8 buffer[64];
+	
+#ifdef SENSOR_SIMULATE
+    ret = STATUS_OK;
+    (*status) = STATUS_SENSOR_READY;
+	return ret;
+#endif
+
+	status = vos_dev_write(hUART, (uint8*)sensor_check, sizeof(sensor_check), NULL);
+	delay_count = 4;
+
+    while(delay_count > 0) {
+	    uart_iocb.ioctl_code = VOS_IOCTL_COMMON_GET_RX_QUEUE_STATUS;
+	    vos_dev_ioctl(hUART, &uart_iocb);
+	    dataAvail = uart_iocb.get.queue_stat;
+
+	    if (dataAvail > 0) {
+            if (dataAvail > sizeof(buffer)) {
+		        dataAvail = sizeof(buffer);
+		    }
+
+			// read from UART
+		    status = vos_dev_read(hUART, &buffer[offset], dataAvail, &actual);
+		    offset += actual;
+
+			/*if (...) {
+			    ret = STATUS_OK;
+			    break;
+	    	} */
+	    }
+    }
+
+    if (STATUS_OK == ret)
+		(*status) = STATUS_SENSOR_READY;
+	else
+		(*status) = STATUS_SENSOR_NOT_READY;
+	
+	return ret;
 }
 	
 #define INSTRUCTION_EXEC_START      1
@@ -1097,23 +1149,56 @@ void notify_android_receive_sensor_data(unsigned char *buf, unsigned short len)
 #endif
 }
 
+#define ERR_NO                          (0)
 #define ERR_READ_SENSOR_TIMEOUT         (1)	
 #define ERR_READ_SENSOR_DATA_NOMATCH    (2)	
+
+uint8 transfer_number_to_string(char *buffer, int digits_len, int data)
+{
+    int digits = 0;
+	int divider = 10;
+	int i = 0;
+	int zeros = 0;
+	uint8 ret = 0;
+
+	for (digits = 1; digits <= digits_len; digits++) {
+        if ((data/divider) == 0)
+			break;
+		else
+			divider = divider*10;
+	}
+
+	memset(buffer, 0, sizeof(buffer));
+
+	if (digits <= digits_len)
+        zeros = digits_len-digits;
+	else {
+		ret = 1;
+		zeros = 0;
+	}
+	
+	for(i = 0; i < zeros; i++) {
+        buffer[i] = '0';
+	}
+	
+    sprintf(&buffer[zeros],"%d", data);
+
+	return ret;
+}
 
 uint8 read_sensor_exec(running_exec *exec)
 {
 	common_ioctl_cb_t uart_iocb;
-	char *tx_sensor = "Request OD data\r";
-	uint8 status = 0, ret = 0;
+	uint8 status = 0, ret = ERR_READ_SENSOR_TIMEOUT;
 	unsigned short dataAvail, actual, offset;
 	unsigned char buffer[PACKET_DATA_SIZE];
 
-	if (exec->instruction_exec_status == INSTRUCTION_EXEC_START) {
-	    status = vos_dev_write(hUART, (uint8*)tx_sensor, 16/*sizeof(tx_sensor)*/, NULL);
-		delay_count = 4;
-		offset = 0;
-		exec->instruction_exec_status = INSTRUCTION_EXEC_RUNNING;
-	} else {
+	status = vos_dev_write(hUART, (uint8*)sensor_request, sizeof(sensor_request), NULL);
+    delay_count = 4;
+	offset = 0;
+	exec->instruction_exec_status = INSTRUCTION_EXEC_RUNNING;
+
+	while (delay_count > 0) {
 #ifndef SENSOR_SIMULATE
 		uart_iocb.ioctl_code = VOS_IOCTL_COMMON_GET_RX_QUEUE_STATUS;
 		vos_dev_ioctl(hUART, &uart_iocb);
@@ -1132,37 +1217,41 @@ uint8 read_sensor_exec(running_exec *exec)
 			offset += actual;
 #else
             offset = dataAvail;
-            memset(buffer, 0, sizeof(buffer));
-            sprintf(buffer,"%d ", experiment_timer);
-            memcpy(&buffer[9], "index: 597, 0704,  0702,  0698,  0698,  0694,  0694,  0692,  0693\r", offset);
+
+            transfer_number_to_string(buffer, 10, machine_info.experiment_timer);
+			buffer[10] = ' ';
+			buffer[11] = ' ';
+            memcpy(&buffer[12], "index: 597, 0704,  0702,  0698,  0698,  0694,  0694,  0692,  0693\r", offset);
 #endif
 			
 			/* check head is "index", end is '\r' */
-			if (buffer[offset-1+9] == '\r') {
-				if (buffer[0+9] == 'i' && buffer[1+9] == 'n' && buffer[2+9] == 'd'
-					&&	buffer[3+9] == 'e' && buffer[4+9] == 'x' ) {
+			if (buffer[offset-1+12] == '\r') {
+				if (buffer[0+12] == 'i' && buffer[1+12] == 'n' && buffer[2+12] == 'd'
+					&&	buffer[3+12] == 'e' && buffer[4+12] == 'x' ) {
 					//	buffer[offset] = '\n';
-					notify_android_receive_sensor_data(buffer, offset+9);
-					write_sensor_data_to_file(buffer, offset+9);
+					notify_android_receive_sensor_data(buffer, offset+12);
+					write_sensor_data_to_file(buffer, offset+12);
+					ret = ERR_NO;
 				} else {
 				    ret = ERR_READ_SENSOR_DATA_NOMATCH;
 			    }
+				
 				offset = 0;
 				/* sensor uart has reponse */
 				machine_info.sensor_status = STATUS_SENSOR_READY;
 				exec->next_instruct_index = exec->current_instruct_index+1;
 				exec->instruction_exec_status = INSTRUCTION_EXEC_END;
+				break;
 			}
 		}
+	}
 			
-		if (delay_count == 0) {
-			offset = 0;
-			/* sensor uart timeout no reponse */
-			machine_info.sensor_status = STATUS_SENSOR_NOT_READY;
-			exec->next_instruct_index = exec->current_instruct_index+1;
-			exec->instruction_exec_status = INSTRUCTION_EXEC_END;
-			ret = ERR_READ_SENSOR_TIMEOUT;
-		}
+	if (ret == ERR_READ_SENSOR_TIMEOUT) {
+        offset = 0;
+		/* sensor uart timeout no reponse */
+		machine_info.sensor_status = STATUS_SENSOR_NOT_READY;
+		exec->next_instruct_index = exec->current_instruct_index+1;
+		exec->instruction_exec_status = INSTRUCTION_EXEC_END;
 	}
 	
 	return ret;
@@ -1242,8 +1331,7 @@ uint8 shaker_set_temperature_exec(running_exec *exec)
 	uint8 buffer[6];
 	
     ret = send_shaker_command(shaker_temperature, sizeof(shaker_temperature));
-	memset(buffer, 0, sizeof(buffer));
-    sprintf(buffer,"%02d", exec->script.arg1);
+	transfer_number_to_string(buffer, 2, exec->script.arg1);
 	ret = send_shaker_command(buffer, 2);
 	ret = send_shaker_command(shaker_end, sizeof(shaker_end));
 	
@@ -1259,8 +1347,8 @@ uint8 shaker_set_speed_exec(running_exec *exec)
 	uint8 buffer[6];
 	
     ret = send_shaker_command(shaker_speed, sizeof(shaker_speed));
-	memset(buffer, 0, sizeof(buffer));
-    sprintf(buffer,"%03d", exec->script.arg1);
+
+	transfer_number_to_string(buffer, 3, exec->script.arg1);
 	ret = send_shaker_command(buffer, 2);
 	ret = send_shaker_command(shaker_end, sizeof(shaker_end));
 	
@@ -1321,7 +1409,8 @@ void experiment_task()
 	current_instruction.current_instruct_index = 0;
 	current_instruction.next_instruct_index = 1;
 	memset(repeat_time, 0, sizeof(repeat_time));
-	experiment_timer = 0;
+	machine_info.experiment_timer = 0;
+	
 	while(1) {
 		// wait for enumeration to complete
 	/*	vos_delay_msecs(100);
@@ -1330,15 +1419,17 @@ void experiment_task()
 		vos_gpio_write_pin(GPIO_B_3, 1);
 		
 	*/	
-	    if (0 != check_mass_storage_status(&machine_info.mass_storage_status))
+	    if (STATUS_OK != check_mass_storage_connect_status(&machine_info.mass_storage_status))
 			continue;
 
-		//if (0 != check_shaker_connect_status(&machine_info.shaker_status))
-		//	continue;
+		if (STATUS_OK != check_shaker_connect_status(&machine_info.shaker_status))
+			continue;
+
+		if (STATUS_OK != check_sensor_connect_status(&machine_info.sensor_status))
+			continue;
 		
-		if ((STATUS_EXPERIMENT_START == experiment_status) || (STATUS_EXPERIMENT_RUNNING == experiment_status)) {
-			
-		    if (0 == check_experiment_script(&current_instruction)) {
+		if ((STATUS_EXPERIMENT_START == machine_info.experiment_status) || (STATUS_EXPERIMENT_RUNNING == machine_info.experiment_status)) {	
+		    if (STATUS_OK == check_experiment_script(&current_instruction)) {
 			    switch(current_instruction.script.instruct_type) {
 				    case INSTRUCT_READ_SENSOR:
 				        ret = read_sensor_exec(&current_instruction);
@@ -1373,7 +1464,7 @@ void experiment_task()
 					break;
 						
 					case INSTRUCT_FINISH:
-						experiment_status = STATUS_EXPERIMENT_FINISH;
+						machine_info.experiment_status = STATUS_EXPERIMENT_FINISH;
 					    memset(&current_instruction, 0, sizeof(running_exec));
 						current_instruction.instruction_exec_status = INSTRUCTION_EXEC_END;
 						current_instruction.current_instruct_index = 0;
@@ -1385,7 +1476,7 @@ void experiment_task()
 					break;
 				}
 			} else {
-                experiment_status = STATUS_EXPERIMENT_STOP;
+                machine_info.experiment_status = STATUS_EXPERIMENT_STOP;
 			}
 	    }
     }
