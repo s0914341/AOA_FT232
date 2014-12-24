@@ -24,7 +24,7 @@
 #define SENSOR_SIMULATE
 #define SHAKER_SIMULATE
 
-const char *version = "001a";
+const char *firmware_version = "001a";
 
 vos_tcb_t *tcbANDROID_RECEIVER;
 vos_tcb_t *tcbEXPERIMENT_TASK;
@@ -46,7 +46,6 @@ VOS_HANDLE hBOMS;                      // Bulk Only Mass Storage for USB disks
 VOS_HANDLE hUART;                      // UART Interface Driver
 
 vos_mutex_t mInitAndroid;						// Mutex to halt AOA activity until setup is complete
-vos_mutex_t mInitF;						// Mutex to halt FT232 activity until setup is complete
 
 machine_status machine_info;
 
@@ -79,14 +78,25 @@ const char *shaker_end = "0 ";
 const char *experiment_data_file = "raw.txt";
 const char *script_file = "Script.txt";
 
+
+const char *manufacturer = "Maestrogen\0";						// Android Open Accessory ID strings
+/* gibson 2014/12/24 */
+const char *model = "ODMonitor\0";
+const char *description = "ODMonitor Accessory Controller\0";	//  expected by the FTDI AOA HyperTerm
+const char *version = "1.0\0";						            //  application on the Android device
+const char *uri = "http://www.ftdichip.com\0";
+const char *serial = "ODMonitorAccessory\0";
+
 /*accessory packet*/
 #define SHAKER_BUFFER_SIZE   64
 uint8 shaker_buffer[SHAKER_BUFFER_SIZE];
 uint8 shaker_buffer_start;
 uint8 shaker_data_size;
 uint32 repeat_time[MAX_REPEAT_LEVEL];
+uint8 can_notify = FALSE;
 
 //android_accessory_packet gstAccPacketWriteSensor;
+android_accessory_packet gstAccPacketNotify;
 android_accessory_packet gstAccPacketWrite;
 android_accessory_packet gstAccPacketRead;
 /* Declaration for IOMUx setup function */
@@ -162,10 +172,10 @@ void main(void)
 	machine_info.sensor_status = STATUS_SENSOR_NOT_READY;
 	machine_info.mass_storage_status = STATUS_MASS_STORAGE_NOT_READY;
 	machine_info.experiment_status = STATUS_EXPERIMENT_IDLE;
-	machine_info.current_instruction = 0;
+	machine_info.current_instruction_index = 0;
 	machine_info.experiment_timer = 0;
 	machine_info.synchronous_sensor_data = SYNCHRONOUS_NO_DATA;
-	memcpy(machine_info.version, version, sizeof(machine_info.version));
+	memcpy(machine_info.version, firmware_version, sizeof(machine_info.version));
 
 	/* Create threads */
 	tcbANDROID_RECEIVER = vos_create_thread_ex(24, 2048, android_receiver, "android_receiver", 0);
@@ -175,8 +185,7 @@ void main(void)
 
  
 	// Initialize Mutexes as locked
-	vos_init_mutex(&mInitAndroid, VOS_MUTEX_LOCKED);
-	vos_init_mutex(&mInitF, VOS_MUTEX_LOCKED);
+	vos_init_mutex(&mInitAndroid, VOS_MUTEX_UNLOCKED);
 	
 	vos_start_scheduler();
 
@@ -644,7 +653,7 @@ uint8 set_experiment_status(uint8 *data, uint8 data_len)
 	char time_buffer[8*3+9];
 	int size = 0;
 
-	if (gstAccPacketRead.u8len == 9) {
+	if (data_len == 9) {
 	    if (STATUS_EXPERIMENT_START == data[0]) {
 		    remove(experiment_data_file);
 
@@ -763,6 +772,31 @@ uint8 get_machine_status()
 	return status;	
 }
 
+uint8 set_tablet_on_off_line(uint8 *data, uint8 data_len)
+{
+	uint8 status, write_len;
+	unsigned short actualw = 0;
+	
+	vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
+	if (data_len == 1) {
+		if (data[0] == 1) {
+	        can_notify = TRUE;
+		} else {
+		    can_notify = FALSE;
+		}
+	}
+	gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
+	gstAccPacketWrite.u8Type = gstAccPacketRead.u8Type;
+	gstAccPacketWrite.u8Status = STATUS_OK;
+	gstAccPacketWrite.u8len = 0;
+	write_len = HEADER_SIZE + gstAccPacketWrite.u8len;
+	if (write_len > 0)
+	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketWrite, write_len, &actualw);
+	vos_unlock_mutex(&mInitAndroid);						// unlock the AOA mutex
+	
+	return status;	
+}
+
 void android_receiver()
 {
 	common_ioctl_cb_t aoa_iocb;
@@ -771,14 +805,6 @@ void android_receiver()
 	unsigned char numRead = 0;
 	unsigned char blink = 0;
 	gpio_ioctl_cb_t gpio_ioca;
-	char *manufacturer 	= "Maestrogen\0";						// Android Open Accessory ID strings
-	//char *model 		= "FTDIUARTDemo\0";				// These need to match the strings
-	/* gibson 2014/11/12 */
-	char *model         = "ODMonitor\0";
-	char *description 	= "ODMonitor Accessory Controller\0";	//  expected by the FTDI AOA HyperTerm
-	char *version 		= "1.0\0";						//  application on the Android device
-	char *uri 			= "http://www.ftdichip.com\0";
-	char *serial 		= "ODMonitorAccessory\0";
 
     // Set all pins to output using an ioctl.
 	gpio_ioca.ioctl_code = VOS_IOCTL_GPIO_SET_MASK;
@@ -795,7 +821,6 @@ void android_receiver()
 			if(hANDROID_ACCESSORY) {
 				device_connect_status |= CONNECTED_ANDROID;
 				vos_gpio_write_pin(GPIO_A_1, 0);				// Android device connected and AOA mode established - Turn on LED at USB1
-				vos_unlock_mutex(&mInitAndroid);				// unlock the AOA mutex	
 				
 				while (device_connect_status&CONNECTED_ANDROID) {
 					//status = vos_dev_read(hANDROID_ACCESSORY,(uint8 *)&gstAccPacketRead, sizeof(gstAccPacketRead) , &numRead);
@@ -830,14 +855,21 @@ void android_receiver()
 									case DATA_TYPE_SET_EXPERIMENT_STATUS:
 									    write_len = set_experiment_status(gstAccPacketRead.u8Data, gstAccPacketRead.u8len);
 									break;
+
+									case DATA_TYPE_SET_TABLET_ON_OFF_LINE:
+									    write_len = set_tablet_on_off_line(gstAccPacketRead.u8Data, gstAccPacketRead.u8len);
+									break;
 								}
 							} 
 					    }
 				    } else {
+				        vos_lock_mutex(&mInitAndroid);
 				        device_connect_status &= ~CONNECTED_ANDROID;
 						android_detach(hANDROID_ACCESSORY);					// Break down the Android device connection
 						vos_gpio_write_pin(GPIO_A_1, 1);					// Turn off LED at USB1
 						hANDROID_ACCESSORY = NULL;
+						can_notify = FALSE;
+						vos_unlock_mutex(&mInitAndroid);				    // unlock the AOA mutex	
 			        }
 			    }
 			}
@@ -1134,19 +1166,22 @@ uint8 check_experiment_script(running_exec *exec)
 void notify_android_receive_sensor_data(unsigned char *buf, unsigned short len)
 {
 	unsigned short actualw;
-	unsigned char status;
-#if 1	
-	if (hANDROID_ACCESSORY != NULL) {
-		vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
-		gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
-		gstAccPacketWrite.u8Type = DATA_TYPE_NOTIFY_EXPERIMENT_DATA;
-		gstAccPacketWrite.u8len = len;
+	uint8 status;
+
+    if (hANDROID_ACCESSORY != NULL) {
+        vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
+		if (FALSE == can_notify) {
+			vos_unlock_mutex(&mInitAndroid);
+		    return;
+		}
+		gstAccPacketNotify.u8Prefix = PREFIX_VALUE;
+		gstAccPacketNotify.u8Type = DATA_TYPE_NOTIFY_EXPERIMENT_DATA;
+		gstAccPacketNotify.u8len = len;
+	    memcpy(gstAccPacketNotify.u8Data, buf, gstAccPacketNotify.u8len);
 		
-		memcpy(gstAccPacketWrite.u8Data, buf, gstAccPacketWrite.u8len);
-		status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketWrite, gstAccPacketWrite.u8len+5, &actualw);		// then write to Android device
+		status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketNotify, gstAccPacketNotify.u8len+5, &actualw);		// then write to Android device
 		vos_unlock_mutex(&mInitAndroid);						// unlock the AOA mutex
-	}
-#endif
+    } 
 }
 
 #define ERR_NO                          (0)
@@ -1370,6 +1405,7 @@ void experiment_task()
 	uint16 actualw, actualr;
 	uint32 cur_loop_count = 0;
 	running_exec current_instruction;
+	uint8 device_status = 0;
 
 	
 	/* UART ioctl call to enable DMA and link to DMA driver */
@@ -1418,18 +1454,23 @@ void experiment_task()
 		vos_delay_msecs(100);
 		vos_gpio_write_pin(GPIO_B_3, 1);
 		
-	*/	
+	*/	device_status = 0;
 	    if (STATUS_OK != check_mass_storage_connect_status(&machine_info.mass_storage_status))
-			continue;
+			device_status = (device_status<<1)|0x01;
 
 		if (STATUS_OK != check_shaker_connect_status(&machine_info.shaker_status))
-			continue;
-
+			device_status = (device_status<<1)|0x01;
+		
 		if (STATUS_OK != check_sensor_connect_status(&machine_info.sensor_status))
+			device_status = (device_status<<1)|0x01;
+
+        if(device_status != 0)
 			continue;
+		
 		
 		if ((STATUS_EXPERIMENT_START == machine_info.experiment_status) || (STATUS_EXPERIMENT_RUNNING == machine_info.experiment_status)) {	
 		    if (STATUS_OK == check_experiment_script(&current_instruction)) {
+				machine_info.current_instruction_index = current_instruction.current_instruct_index;
 			    switch(current_instruction.script.instruct_type) {
 				    case INSTRUCT_READ_SENSOR:
 				        ret = read_sensor_exec(&current_instruction);

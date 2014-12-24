@@ -77,6 +77,7 @@ DATA_TYPE_GET_SHAKER_RETURN,
 DATA_TYPE_GET_EXPERIMENT_DATA,
 DATA_TYPE_SET_EXPERIMENT_SCRIPT,
 DATA_TYPE_SET_EXPERIMENT_STATUS,
+DATA_TYPE_SET_TABLET_ON_OFF_LINE,
 
 DATA_TYPE_NOTIFY_EXPERIMENT_DATA,
 
@@ -136,7 +137,7 @@ typedef struct {
 	uint8 mass_storage_status;
 	uint8 experiment_status;
 	uint8 synchronous_sensor_data;
-	uint32 current_instruction;
+	uint32 current_instruction_index;
 	uint32 experiment_timer;
 	uint8 version[4];
 } machine_status;
