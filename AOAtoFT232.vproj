@@ -673,7 +673,8 @@
 	</Files>
 	<ReflasherFile></ReflasherFile>
 	<SetProjectVersion>false</SetProjectVersion>
-	<IncludeReflasher>false</IncludeReflasher>	<LibraryFiles>
+	<IncludeReflasher>false</IncludeReflasher>
+	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>kernel.a</filename>
 		<fileType>3</fileType>
@@ -690,7 +691,6 @@
 		<ID>{00000000-0000-0000-0000-000000000007}</ID>
 		<ParentID>{00000000-0000-0000-0000-000000000003}</ParentID>
 	</VirtualFolderGroup>
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>USBHostFT232.a</filename>
@@ -703,7 +703,6 @@
 		<ID>{00000000-0000-0000-0000-000000000008}</ID>
 		<ParentID>{00000000-0000-0000-0000-000000000003}</ParentID>
 	</VirtualFolderGroup>
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>USBHostAndroidAccessory.a</filename>
@@ -711,7 +710,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>GPIO.a</filename>
@@ -719,7 +717,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>USBHost.a</filename>
@@ -727,7 +724,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>FAT.a</filename>
@@ -735,7 +731,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>BOMS.a</filename>
@@ -743,7 +738,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>UART.a</filename>
@@ -751,7 +745,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>Timers.a</filename>
@@ -759,7 +752,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>FirmwareUpdateFATFile.a</filename>
@@ -767,7 +759,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000008}</VirtualFolder>
 	</LibraryFiles>
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>string.a</filename>
@@ -780,7 +771,6 @@
 		<ID>{00000000-0000-0000-0000-000000000009}</ID>
 		<ParentID>{00000000-0000-0000-0000-000000000003}</ParentID>
 	</VirtualFolderGroup>
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>stdio.a</filename>
@@ -788,10 +778,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000009}</VirtualFolder>
 	</LibraryFiles>
-	
-	
-	
-	
 	<LibraryFiles>
 		<fileDir></fileDir>
 		<filename>vos.h</filename>
@@ -966,28 +952,6 @@
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000006}</VirtualFolder>
 	</LibraryFiles>
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	<BuildList>
 		<filename>AOAtoFT232.c</filename>
 	</BuildList>
@@ -1029,8 +993,7 @@
 	</BuildList>
 	<BuildList>
 		<filename>stdio.a</filename>
-	</BuildList>
-	<OpenFilesList>
+	</BuildList>	<OpenFilesList>
 		<filename>AOAtoFT232.c</filename>
 		<actvieTabIndex>0</actvieTabIndex>
 	</OpenFilesList>

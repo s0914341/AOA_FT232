@@ -1225,7 +1225,8 @@ uint8 read_sensor_exec(running_exec *exec)
 {
 	common_ioctl_cb_t uart_iocb;
 	uint8 status = 0, ret = ERR_READ_SENSOR_TIMEOUT;
-	unsigned short dataAvail, actual, offset;
+	unsigned short dataAvail, actual, offset, total_len;
+	unsigned char raw_buffer[PACKET_DATA_SIZE];
 	unsigned char buffer[PACKET_DATA_SIZE];
 
 	status = vos_dev_write(hUART, (uint8*)sensor_request, sizeof(sensor_request), NULL);
@@ -1248,24 +1249,38 @@ uint8 read_sensor_exec(running_exec *exec)
 			}
 #ifndef SENSOR_SIMULATE
 			// read from UART
-			status = vos_dev_read(hUART, &buffer[offset], dataAvail, &actual);
+			status = vos_dev_read(hUART, &raw_buffer[offset], dataAvail, &actual);
 			offset += actual;
 #else
-            offset = dataAvail;
-
-            transfer_number_to_string(buffer, 10, machine_info.experiment_timer);
-			buffer[10] = ' ';
-			buffer[11] = ' ';
-            memcpy(&buffer[12], "index: 597, 0704,  0702,  0698,  0698,  0694,  0694,  0692,  0693\r", offset);
+            memcpy(raw_buffer, "index: 597, 0704,  0702,  0698,  0698,  0694,  0694,  0692,  0693\r", dataAvail);
+			offset += dataAvail;
 #endif
 			
 			/* check head is "index", end is '\r' */
-			if (buffer[offset-1+12] == '\r') {
-				if (buffer[0+12] == 'i' && buffer[1+12] == 'n' && buffer[2+12] == 'd'
-					&&	buffer[3+12] == 'e' && buffer[4+12] == 'x' ) {
+			if (raw_buffer[offset-1] == '\r') {
+				if (raw_buffer[0] == 'i' && raw_buffer[1] == 'n' && raw_buffer[2] == 'd'
+					&&	raw_buffer[3] == 'e' && raw_buffer[4] == 'x' ) {
 					//	buffer[offset] = '\n';
-					notify_android_receive_sensor_data(buffer, offset+12);
-					write_sensor_data_to_file(buffer, offset+12);
+					total_len = 0;
+                    transfer_number_to_string(&buffer[total_len], 3, exec->pre_raw_index);
+					total_len += 3;
+					buffer[total_len] = ' ';
+					total_len += 1;
+					transfer_number_to_string(&buffer[total_len], 3, exec->current_raw_index);
+					total_len += 3;
+					buffer[total_len] = ' ';
+					total_len += 1;
+					transfer_number_to_string(&buffer[total_len], 10, machine_info.experiment_timer);
+                    total_len += 10;
+					buffer[total_len] = ' ';
+					total_len += 1;
+					memcpy(&buffer[total_len], raw_buffer, offset);
+					total_len += offset;
+					exec->pre_raw_index = exec->current_raw_index;
+					exec->current_raw_index++;
+					
+					notify_android_receive_sensor_data(buffer, total_len);
+					write_sensor_data_to_file(buffer, total_len);
 					ret = ERR_NO;
 				} else {
 				    ret = ERR_READ_SENSOR_DATA_NOMATCH;

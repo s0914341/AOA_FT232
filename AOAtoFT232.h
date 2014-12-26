@@ -185,6 +185,8 @@ typedef struct {
 	uint32 current_instruct_index;
 	uint32 next_instruct_index;
 	uint8 instruction_exec_status;
+	uint8 current_raw_index;
+	uint8 pre_raw_index;
 	script_instruction script;
 	repeat_info repeat_count[MAX_REPEAT_LEVEL];
 	repeat_info repeat_time[MAX_REPEAT_LEVEL];
