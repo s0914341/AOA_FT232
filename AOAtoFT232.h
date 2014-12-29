@@ -191,5 +191,9 @@ typedef struct {
 	repeat_info repeat_count[MAX_REPEAT_LEVEL];
 	repeat_info repeat_time[MAX_REPEAT_LEVEL];
 } running_exec;
+
+typedef struct {
+	uint32 get_address;
+} file_information;
 		
 #endif /* _AOAtoFT232_H_ */
