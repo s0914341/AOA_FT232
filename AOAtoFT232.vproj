@@ -951,7 +951,24 @@
 		<fileType>4</fileType>
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000006}</VirtualFolder>
-	</LibraryFiles>
+	</LibraryFiles>	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	<BuildList>
 		<filename>AOAtoFT232.c</filename>
 	</BuildList>
@@ -993,7 +1010,8 @@
 	</BuildList>
 	<BuildList>
 		<filename>stdio.a</filename>
-	</BuildList>	<OpenFilesList>
+	</BuildList>
+	<OpenFilesList>
 		<filename>AOAtoFT232.c</filename>
 		<actvieTabIndex>0</actvieTabIndex>
 	</OpenFilesList>

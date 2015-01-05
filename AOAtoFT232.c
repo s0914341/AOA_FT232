@@ -46,6 +46,7 @@ VOS_HANDLE hBOMS;                      // Bulk Only Mass Storage for USB disks
 VOS_HANDLE hUART;                      // UART Interface Driver
 
 vos_mutex_t mInitAndroid;						// Mutex to halt AOA activity until setup is complete
+vos_mutex_t mFile;
 
 machine_status machine_info;
 
@@ -97,8 +98,8 @@ uint8 can_notify = FALSE;
 uint32 get_experiment_file_address;
 
 //android_accessory_packet gstAccPacketWriteSensor;
-android_accessory_packet gstAccPacketNotify;
-android_accessory_packet gstAccPacketWrite;
+//android_accessory_packet gstAccPacketNotify;
+//android_accessory_packet gstAccPacketWrite;
 android_accessory_packet gstAccPacketRead;
 /* Declaration for IOMUx setup function */
 void iomux_setup(void);
@@ -180,13 +181,14 @@ void main(void)
 
 	/* Create threads */
 	tcbANDROID_RECEIVER = vos_create_thread_ex(24, 2048, android_receiver, "android_receiver", 0);
-	tcbEXPERIMENT_TASK = vos_create_thread_ex(24, 2048, experiment_task, "experiment_task", 0);
+	tcbEXPERIMENT_TASK = vos_create_thread_ex(12, 2048, experiment_task, "experiment_task", 0);
 	/* timer tick thread */
-    tcbTIMER_TICK = vos_create_thread_ex(24, 1024, timer_tick, "timer_tick", 0);
+    tcbTIMER_TICK = vos_create_thread_ex(26, 1024, timer_tick, "timer_tick", 0);
 
  
 	// Initialize Mutexes as locked
 	vos_init_mutex(&mInitAndroid, VOS_MUTEX_UNLOCKED);
+	vos_init_mutex(&mFile, VOS_MUTEX_UNLOCKED);
 	
 	vos_start_scheduler();
 
@@ -493,11 +495,13 @@ uint8 write_sensor_data_to_file(unsigned char *buf, unsigned short len)
 	FILE *file;
 	uint8 ret = 0;
 
+    vos_lock_mutex(&mFile);// hold here until unlocked - lock then proceed
     // now call the stdio runtime functions
 	file = fopen(experiment_data_file, "a+");
 
 	if (file == NULL) {
 		ret |= ERR_OPEN_FILE_FAIL;
+		vos_unlock_mutex(&mFile);
 		return ret;
 	}
 
@@ -507,9 +511,11 @@ uint8 write_sensor_data_to_file(unsigned char *buf, unsigned short len)
 
 	if (fclose(file) == -1) {
 		ret |= ERR_CLOSE_FILE_FAIL;
+		vos_unlock_mutex(&mFile);
 		return ret;
 	}
 
+    vos_unlock_mutex(&mFile);
 	return ret;
 }
 
@@ -544,7 +550,7 @@ uint8 write_data_to_shaker(uint8 *data, uint8 data_len, uint16 *actualw)
 		
 	return status;
 }
-	
+/*	
 uint8 get_shaker_return()
 {
 	uint8 offset, len;
@@ -567,7 +573,7 @@ uint8 get_shaker_return()
 	
     gstAccPacketWrite.u8Status = STATUS_OK;
 	return (HEADER_SIZE + gstAccPacketWrite.u8len);
-}
+}*/
 	
 uint8 set_experiment_script(android_accessory_packet *packet)
 {
@@ -575,6 +581,12 @@ uint8 set_experiment_script(android_accessory_packet *packet)
 	unsigned short actualw = 0;
 	FILE *file;
 	uint8 ret = 0;
+	android_accessory_packet *write_packet;
+
+	write_packet = vos_malloc(sizeof(android_accessory_packet));
+	if (write_packet == NULL) {
+		return 1;
+	}
 
     // now call the stdio runtime functions
 	
@@ -598,15 +610,15 @@ uint8 set_experiment_script(android_accessory_packet *packet)
 		ret |= ERR_CLOSE_FILE_FAIL;
 	}
 	
-	vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
-	gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
-	gstAccPacketWrite.u8Type = gstAccPacketRead.u8Type;
-	gstAccPacketWrite.u8Status = packet->u8Status;
-	gstAccPacketWrite.u8len = 0;
-	write_len = HEADER_SIZE + gstAccPacketWrite.u8len;
+	write_packet->u8Prefix = PREFIX_VALUE;
+	write_packet->u8Type = gstAccPacketRead.u8Type;
+	write_packet->u8Status = packet->u8Status;
+	write_packet->u8len = 0;
+	write_len = HEADER_SIZE + write_packet->u8len;
 	if (write_len > 0)
-	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketWrite, write_len, &actualw);
-	vos_unlock_mutex(&mInitAndroid);						// unlock the AOA mutex
+	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)write_packet, write_len, &actualw);
+
+	vos_free(write_packet);
 	
 	return status;	
 }
@@ -637,7 +649,6 @@ void do_firmware_update()
 		if (fwrite(buffer, sizeof(buffer), sizeof(uint8), log_file) == -1) {
 			return;
 		}
-
 	
 	    if (fclose(log_file) == -1) {
 		    return;
@@ -649,39 +660,52 @@ void do_firmware_update()
 	
 uint8 set_experiment_status(uint8 *data, uint8 data_len)
 {
-	uint8 status, write_len;
+	uint8 status = STATUS_OK, write_len;
 	unsigned short actualw = 0;
 	char time_buffer[8*3+9];
 	int size = 0;
+	android_accessory_packet *write_packet;
+
+	write_packet = vos_malloc(sizeof(android_accessory_packet));
+	if (write_packet == NULL) {
+		return 1;
+	}
 
 	if (data_len == 9) {
 	    if (STATUS_EXPERIMENT_START == data[0]) {
-		    remove(experiment_data_file);
+			if (STATUS_MASS_STORAGE_READY == machine_info.mass_storage_status) {
+		        remove(experiment_data_file);
 
-		    /* first write start time to file */
-			memset(time_buffer, 0, sizeof(time_buffer));
-		    sprintf(time_buffer,"%d/%d/%d/%d/%d/%d/%d/%d\n",
-		    data[1],data[2],data[3],data[4],data[5],
-		    data[6],data[7],data[8]);
-			for (size = 0; size < sizeof(time_buffer); size++) {
-                if (time_buffer[size] == '\n')
-					break;
+		        /* first write start time to file */
+			    memset(time_buffer, 0, sizeof(time_buffer));
+		        sprintf(time_buffer,"%d/%d/%d/%d/%d/%d/%d/%d\n",
+		        data[1],data[2],data[3],data[4],data[5],
+		        data[6],data[7],data[8]);
+			    for (size = 0; size < sizeof(time_buffer); size++) {
+                    if (time_buffer[size] == '\n')
+					    break;
+			    }
+		        write_sensor_data_to_file(time_buffer, (unsigned short)(size+1));
+			} else {
+                status = STATUS_FAIL;
 			}
-		    write_sensor_data_to_file(time_buffer, (unsigned short)(size+1));
 	    }
 	}
-	machine_info.experiment_status = data[0];
-	machine_info.experiment_timer = 0;
 
-	vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
-	gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
-	gstAccPacketWrite.u8Type = gstAccPacketRead.u8Type;
-	gstAccPacketWrite.u8Status = STATUS_OK;
-	gstAccPacketWrite.u8len = 0;
-	write_len = HEADER_SIZE + gstAccPacketWrite.u8len;
+	if (status == STATUS_OK) {
+	    machine_info.experiment_status = data[0];
+	    machine_info.experiment_timer = 0;
+	}
+
+	write_packet->u8Prefix = PREFIX_VALUE;
+	write_packet->u8Type = gstAccPacketRead.u8Type;
+	write_packet->u8Status = status;
+	write_packet->u8len = 0;
+	write_len = HEADER_SIZE + write_packet->u8len;
 	if (write_len > 0)
-	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketWrite, write_len, &actualw);
-	vos_unlock_mutex(&mInitAndroid);						// unlock the AOA mutex
+	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)write_packet, write_len, &actualw);
+
+	vos_free(write_packet);
 	
 	return status;	
 }
@@ -694,50 +718,58 @@ uint8 get_experiment_data(android_accessory_packet *packet)
 	uint8 end_read = 0;
 	uint8 ret = 0;
 	file_information file_info;
+	android_accessory_packet *write_packet;
 
+	write_packet = vos_malloc(sizeof(android_accessory_packet));
+	if (write_packet == NULL) {
+		return 1;
+	}
+
+    vos_lock_mutex(&mFile);// hold here until unlocked - lock then proceed
     // now call the stdio runtime functions
-	file = fopen(experiment_data_file, "r");
+    if (STATUS_MASS_STORAGE_READY == machine_info.mass_storage_status)
+	    file = fopen(experiment_data_file, "r");
+	else
+		file = NULL;
 
 	if (file == NULL) {
 		ret |= ERR_OPEN_FILE_FAIL;
 	}
 
-	gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
-	gstAccPacketWrite.u8Type = gstAccPacketRead.u8Type;
+	write_packet->u8Prefix = PREFIX_VALUE;
+	write_packet->u8Type = gstAccPacketRead.u8Type;
  
 	if (ret != 0) {
-		 gstAccPacketWrite.u8len = 0;
-		 gstAccPacketWrite.u8Status = STATUS_FAIL;
-		 write_len = HEADER_SIZE + gstAccPacketWrite.u8len;
-		 vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
-	     status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketWrite, write_len, &actualw);
-		 vos_unlock_mutex(&mInitAndroid);
+		 write_packet->u8len = 0;
+		 write_packet->u8Status = STATUS_FAIL;
+		 write_len = HEADER_SIZE + write_packet->u8len;
+	     status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)write_packet, write_len, &actualw);
 	} else {
         memcpy(&file_info, packet->u8Data, packet->u8len);
 		fseek(file, file_info.get_address, SEEK_SET);
-	    gstAccPacketWrite.u8len = fread(gstAccPacketWrite.u8Data, PACKET_DATA_SIZE, 1, file);
-	    if (gstAccPacketWrite.u8len > 0) {
+	    write_packet->u8len = fread(write_packet->u8Data, PACKET_DATA_SIZE, 1, file);
+	    if (write_packet->u8len > 0) {
 		    if (feof(file)) {
-			    gstAccPacketWrite.u8Status = STATUS_OK;
+			    write_packet->u8Status = STATUS_OK;
 		    } else {
-			    gstAccPacketWrite.u8Status = STATUS_HAVE_DATA;
+			    write_packet->u8Status = STATUS_HAVE_DATA;
 			}
 	    } else {
-	        gstAccPacketWrite.u8len = 0;
-		    gstAccPacketWrite.u8Status = STATUS_FAIL;
+	        write_packet->u8len = 0;
+		    write_packet->u8Status = STATUS_FAIL;
 			ret |= ERR_WRITE_FILE_FAIL;		
 	    }
 
-        write_len = HEADER_SIZE + gstAccPacketWrite.u8len;
-	    vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
-	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketWrite, write_len, &actualw);
-		vos_unlock_mutex(&mInitAndroid);	
-     
+        write_len = HEADER_SIZE + write_packet->u8len;
+	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)write_packet, write_len, &actualw);
 
 	    if (fclose(file) == -1) {
 		    ret |= ERR_CLOSE_FILE_FAIL;
 	    }
 	}
+    vos_unlock_mutex(&mFile);// hold here until unlocked - lock then proceed
+
+	vos_free(write_packet);
 	
 	return ret;	
 }
@@ -746,19 +778,25 @@ uint8 manual_send_shaker_command(uint8 *data, uint8 data_len)
 {
 	uint8 status, write_len;
 	uint16 actualw = 0;
+	android_accessory_packet *write_packet;
+
+	write_packet = vos_malloc(sizeof(android_accessory_packet));
+	if (write_packet == NULL) {
+		return 1;
+	}
 	
 	/* then write to the FT232 */
 	status = write_data_to_shaker(data, data_len, &actualw);
 		
-	vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
-	gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
-	gstAccPacketWrite.u8Type = gstAccPacketRead.u8Type;	
-	gstAccPacketWrite.u8Status = STATUS_OK;
-	gstAccPacketWrite.u8len = 0;
-	write_len = HEADER_SIZE + gstAccPacketWrite.u8len;
+	write_packet->u8Prefix = PREFIX_VALUE;
+	write_packet->u8Type = gstAccPacketRead.u8Type;	
+	write_packet->u8Status = STATUS_OK;
+	write_packet->u8len = 0;
+	write_len = HEADER_SIZE + write_packet->u8len;
 	if (write_len > 0)
-	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketWrite, write_len, &actualw);
-	vos_unlock_mutex(&mInitAndroid);	// unlock the AOA mutex
+	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)write_packet, write_len, &actualw);
+
+    vos_free(write_packet);
 	
 	return status;	
 }
@@ -767,17 +805,23 @@ uint8 get_machine_status()
 {
 	uint8 status, write_len;
 	unsigned short actualw = 0;
+	android_accessory_packet *write_packet;
+
+	write_packet = vos_malloc(sizeof(android_accessory_packet));
+	if (write_packet == NULL) {
+		return 1;
+	}
 	
-	vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
-	gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
-	gstAccPacketWrite.u8Type = gstAccPacketRead.u8Type;	
-	memcpy(gstAccPacketWrite.u8Data, &machine_info, sizeof(machine_info));
-	gstAccPacketWrite.u8Status = STATUS_OK;
-	gstAccPacketWrite.u8len = sizeof(machine_info);
-	write_len = HEADER_SIZE + gstAccPacketWrite.u8len;
+	write_packet->u8Prefix = PREFIX_VALUE;
+	write_packet->u8Type = gstAccPacketRead.u8Type;	
+	memcpy(write_packet->u8Data, &machine_info, sizeof(machine_info));
+	write_packet->u8Status = STATUS_OK;
+	write_packet->u8len = sizeof(machine_info);
+	write_len = HEADER_SIZE + write_packet->u8len;
 	if (write_len > 0)
-	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketWrite, write_len, &actualw);
-	vos_unlock_mutex(&mInitAndroid);	// unlock the AOA mutex
+	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)write_packet, write_len, &actualw);
+
+	vos_free(write_packet);
 	
 	return status;	
 }
@@ -785,9 +829,14 @@ uint8 get_machine_status()
 uint8 set_tablet_on_off_line(uint8 *data, uint8 data_len)
 {
 	uint8 status, write_len;
-	unsigned short actualw = 0;
+	unsigned short actualw = 0;
+	android_accessory_packet *write_packet;
 	
-	vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
+	write_packet = vos_malloc(sizeof(android_accessory_packet));
+	if (write_packet == NULL) {
+		return 1;
+	}
+	
 	if (data_len == 1) {
 		if (data[0] == 1) {
 	        can_notify = TRUE;
@@ -795,15 +844,15 @@ uint8 set_tablet_on_off_line(uint8 *data, uint8 data_len)
 		    can_notify = FALSE;
 		}
 	}
-	gstAccPacketWrite.u8Prefix = PREFIX_VALUE;
-	gstAccPacketWrite.u8Type = gstAccPacketRead.u8Type;
-	gstAccPacketWrite.u8Status = STATUS_OK;
-	gstAccPacketWrite.u8len = 0;
-	write_len = HEADER_SIZE + gstAccPacketWrite.u8len;
+	write_packet->u8Prefix = PREFIX_VALUE;
+	write_packet->u8Type = gstAccPacketRead.u8Type;
+	write_packet->u8Status = STATUS_OK;
+	write_packet->u8len = 0;
+	write_len = HEADER_SIZE + write_packet->u8len;
 	if (write_len > 0)
-	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketWrite, write_len, &actualw);
-	vos_unlock_mutex(&mInitAndroid);						// unlock the AOA mutex
-	
+	    status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)write_packet, write_len, &actualw);
+
+    vos_free(write_packet);
 	return status;	
 }
 
@@ -852,7 +901,7 @@ void android_receiver()
 									break;
 									
 									case DATA_TYPE_GET_SHAKER_RETURN:
-									    write_len = get_shaker_return();
+								//	    write_len = get_shaker_return();
 									break;
 									
 									case DATA_TYPE_GET_EXPERIMENT_DATA:
@@ -1150,26 +1199,36 @@ uint8 check_experiment_script(running_exec *exec)
 	experiment_script_header header;
 	
 	if (INSTRUCTION_EXEC_END == (exec->instruction_exec_status)) {
-	    file = fopen(script_file, "r");
+		vos_lock_mutex(&mFile);// hold here until unlocked - lock then proceed
+		ret = 0;
+		file = fopen(script_file, "r");
 	
 	    if (file == NULL) {
 		    ret |= ERR_OPEN_FILE_FAIL;
+		    vos_unlock_mutex(&mFile);
 		    return ret;
 	    }
 		
-		fread(&header, sizeof(experiment_script_header), 1, file);
-		//(*cur_instruct_index)++;
+		if (sizeof(experiment_script_header) != fread(&header, sizeof(experiment_script_header), 1, file))
+		    ret |= ERR_READ_FILE_FAIL;
+
 		fseek(file, (exec->next_instruct_index-1)*sizeof(script_instruction), SEEK_CUR);
-		fread(&(exec->script), sizeof(script_instruction), 1, file);
-		exec->current_instruct_index = exec->script.instruct_index;
+		if (sizeof(script_instruction) != fread(&(exec->script), sizeof(script_instruction), 1, file))
+			ret |= ERR_READ_FILE_FAIL;
 		
 	    if (fclose(file) == -1) {
 		    ret |= ERR_CLOSE_FILE_FAIL;
+			vos_unlock_mutex(&mFile);
 		    return ret;
 	    }
 
-		exec->instruction_exec_status = INSTRUCTION_EXEC_START;
+        if (0 == ret) {
+            exec->current_instruct_index = exec->script.instruct_index;
+		    exec->instruction_exec_status = INSTRUCTION_EXEC_START;
+        }
 	}
+	
+	vos_unlock_mutex(&mFile);
 
 	return ret;
 }
@@ -1178,20 +1237,25 @@ void notify_android_receive_sensor_data(unsigned char *buf, unsigned short len)
 {
 	unsigned short actualw;
 	uint8 status;
+	android_accessory_packet *write_packet;
 
     if (hANDROID_ACCESSORY != NULL) {
-        vos_lock_mutex(&mInitAndroid);// hold here until unlocked - lock then proceed
 		if (FALSE == can_notify) {
-			vos_unlock_mutex(&mInitAndroid);
 		    return;
 		}
-		gstAccPacketNotify.u8Prefix = PREFIX_VALUE;
-		gstAccPacketNotify.u8Type = DATA_TYPE_NOTIFY_EXPERIMENT_DATA;
-		gstAccPacketNotify.u8len = len;
-	    memcpy(gstAccPacketNotify.u8Data, buf, gstAccPacketNotify.u8len);
+
+	    write_packet = vos_malloc(sizeof(android_accessory_packet));
+	    if (write_packet == NULL) {
+		    return 1;
+	    }
 		
-		status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)&gstAccPacketNotify, gstAccPacketNotify.u8len+5, &actualw);		// then write to Android device
-		vos_unlock_mutex(&mInitAndroid);						// unlock the AOA mutex
+		write_packet->u8Prefix = PREFIX_VALUE;
+		write_packet->u8Type = DATA_TYPE_NOTIFY_EXPERIMENT_DATA;
+		write_packet->u8len = len;
+	    memcpy(write_packet->u8Data, buf, write_packet->u8len);
+		
+		status = vos_dev_write(hANDROID_ACCESSORY, (uint8 *)write_packet, write_packet->u8len+5, &actualw);		// then write to Android device
+	    vos_free(write_packet);
     } 
 }
 
@@ -1543,7 +1607,7 @@ void experiment_task()
 					break;
 				}
 			} else {
-                machine_info.experiment_status = STATUS_EXPERIMENT_STOP;
+                //machine_info.experiment_status = STATUS_EXPERIMENT_STOP;
 			}
 	    }
     }
