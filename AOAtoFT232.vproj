@@ -1,7 +1,7 @@
 <Project>
 	<Version>1.2</Version>
 	<ProjectName>AOAtoFT232</ProjectName>
-	<ProjectLocation>D:\FTDI\AOAtoFT232</ProjectLocation>
+	<ProjectLocation>D:\FTDI\AOA_FT232</ProjectLocation>
 	<ProjectSolution>AOAtoFT232</ProjectSolution>
 	<ProjectVersion>1.0</ProjectVersion>
 	<OutputDir></OutputDir>
@@ -951,25 +951,7 @@
 		<fileType>4</fileType>
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000006}</VirtualFolder>
-	</LibraryFiles>	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	<BuildList>
+	</LibraryFiles>	<BuildList>
 		<filename>AOAtoFT232.c</filename>
 	</BuildList>
 	<BuildList>
@@ -1024,4 +1006,8 @@
 	<OpenFilesList>
 		<filename>FirmwareUpdate.h</filename>
 	</OpenFilesList>
+	<WatchVariableList>
+		<WatchVarName>cmd_len</WatchVarName>
+		<DisplayType>2</DisplayType>
+	</WatchVariableList>
 </Project>

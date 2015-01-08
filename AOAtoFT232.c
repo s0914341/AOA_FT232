@@ -21,8 +21,8 @@
 
 #include "AOAtoFT232.h"
 
-#define SENSOR_SIMULATE
-#define SHAKER_SIMULATE
+//#define SENSOR_SIMULATE
+//#define SHAKER_SIMULATE
 
 const char *firmware_version = "001a";
 
@@ -96,6 +96,7 @@ uint8 shaker_data_size;
 uint32 repeat_time[MAX_REPEAT_LEVEL];
 uint8 can_notify = FALSE;
 uint32 get_experiment_file_address;
+uint8 check_sensor_delay;
 
 //android_accessory_packet gstAccPacketWriteSensor;
 //android_accessory_packet gstAccPacketNotify;
@@ -479,6 +480,9 @@ void timer_tick() {
 	     if (experiment_delay > 0)
 		     experiment_delay--;
 
+		 if (check_sensor_delay > 0)
+		     check_sensor_delay--;
+			
          if ((machine_info.experiment_status == STATUS_EXPERIMENT_START) ||
 		 	 (machine_info.experiment_status == STATUS_EXPERIMENT_RUNNING))
 		     machine_info.experiment_timer++;
@@ -519,23 +523,21 @@ uint8 write_sensor_data_to_file(unsigned char *buf, unsigned short len)
 	return ret;
 }
 
-uint8 read_data_from_shaker(uint8 *data, uint8 max_len, uint16 *actualw)
+uint8 read_data_from_shaker(uint8 *data, uint8 len, uint16 *actualw)
 {	
 	uint8 status = 1;
 	common_ioctl_cb_t ft232_iocb;
-	uint16 dataAvail = 0;
+	uint8 time_out_count = 5;
+	uint16 offset = 0;
 
-    if (hUSBHOST_FT232 != NULL) {
-        ft232_iocb.ioctl_code = VOS_IOCTL_COMMON_GET_RX_QUEUE_STATUS;					// check whether any data is 
-        status = vos_dev_ioctl(hUSBHOST_FT232, &ft232_iocb);							// available at from the FT232
-        dataAvail = ft232_iocb.get.queue_stat;
-
-        if (dataAvail > max_len) {				// If there is more data than the buffer size.
-	        dataAvail = max_len; 				// ... then limit the number of bytes to the buffer size
-        }
-					
-	    if (dataAvail > 0) 								                            // If there is any data available
-	        status = vos_dev_read(hUSBHOST_FT232, data, dataAvail, actualw); 		// read from FT232 device
+    while ((hUSBHOST_FT232 != NULL) && (time_out_count > 0)) {
+		vos_delay_msecs(1);
+		time_out_count--;
+      
+		status = vos_dev_read(hUSBHOST_FT232, &data[offset], len, actualw); 		// read from FT232 device
+		offset += *actualw;
+		if (offset >= len)			
+			break;
 	}
 		
 	return status;
@@ -671,24 +673,30 @@ uint8 set_experiment_status(uint8 *data, uint8 data_len)
 		return 1;
 	}
 
-	if (data_len == 9) {
+	if (data_len > 0) {
 	    if (STATUS_EXPERIMENT_START == data[0]) {
-			if (STATUS_MASS_STORAGE_READY == machine_info.mass_storage_status) {
-		        remove(experiment_data_file);
+            if (data_len == 9) {
+			    if (STATUS_MASS_STORAGE_READY == machine_info.mass_storage_status) {
+		            remove(experiment_data_file);
 
-		        /* first write start time to file */
-			    memset(time_buffer, 0, sizeof(time_buffer));
-		        sprintf(time_buffer,"%d/%d/%d/%d/%d/%d/%d/%d\n",
-		        data[1],data[2],data[3],data[4],data[5],
-		        data[6],data[7],data[8]);
-			    for (size = 0; size < sizeof(time_buffer); size++) {
-                    if (time_buffer[size] == '\n')
-					    break;
+		            /* first write start time to file */
+			        memset(time_buffer, 0, sizeof(time_buffer));
+		            sprintf(time_buffer,"%d/%d/%d/%d/%d/%d/%d/%d\n",
+		            data[1],data[2],data[3],data[4],data[5],
+		            data[6],data[7],data[8]);
+			        for (size = 0; size < sizeof(time_buffer); size++) {
+                        if (time_buffer[size] == '\n')
+					        break;
+			        }
+		            write_sensor_data_to_file(time_buffer, (unsigned short)(size+1));
+			    } else {
+                    status = STATUS_FAIL;
 			    }
-		        write_sensor_data_to_file(time_buffer, (unsigned short)(size+1));
-			} else {
+            } else {
                 status = STATUS_FAIL;
 			}
+	    } else if (STATUS_EXPERIMENT_STOP == data[0]) {
+	    
 	    }
 	}
 
@@ -829,7 +837,8 @@ uint8 get_machine_status()
 uint8 set_tablet_on_off_line(uint8 *data, uint8 data_len)
 {
 	uint8 status, write_len;
-	unsigned short actualw = 0;
+	unsigned short actualw = 0;
+
 	android_accessory_packet *write_packet;
 	
 	write_packet = vos_malloc(sizeof(android_accessory_packet));
@@ -876,6 +885,7 @@ void android_receiver()
 	
 	hUSBHOST1_Android = vos_dev_open(VOS_DEV_USBHOST_1);		// Open USB Host Port 1 for android
 	while(1) {
+		vos_delay_msecs(1);
 		if (usbhost_connect_state(hUSBHOST1_Android)) {
 			hANDROID_ACCESSORY = android_attach(hUSBHOST1_Android, VOS_DEV_ANDROID_ACCESSORY, manufacturer, model, description, version, uri, serial);
 			if(hANDROID_ACCESSORY) {
@@ -883,6 +893,7 @@ void android_receiver()
 				vos_gpio_write_pin(GPIO_A_1, 0);				// Android device connected and AOA mode established - Turn on LED at USB1
 				
 				while (device_connect_status&CONNECTED_ANDROID) {
+					vos_delay_msecs(1);
 					//status = vos_dev_read(hANDROID_ACCESSORY,(uint8 *)&gstAccPacketRead, sizeof(gstAccPacketRead) , &numRead);
 					status = vos_dev_read(hANDROID_ACCESSORY,(uint8 *)&gstAccPacketRead, sizeof(gstAccPacketRead) , &numRead);
 
@@ -1054,12 +1065,13 @@ uint8 check_shaker_connect_status(uint8 *status)
 	}
 }
 
-uint8 check_sensor_connect_status(uint8 *status)
+uint8 check_sensor_connect_status(uint8* status)
 {
-    uint8 ret = 1;
+    volatile uint8 ret = 1;
     common_ioctl_cb_t uart_iocb;
 	unsigned short dataAvail, actual, offset;
 	uint8 buffer[64];
+	uint8 read_ret, write_ret;
 	
 #ifdef SENSOR_SIMULATE
     ret = STATUS_OK;
@@ -1067,23 +1079,33 @@ uint8 check_sensor_connect_status(uint8 *status)
 	return ret;
 #endif
 
-	status = vos_dev_write(hUART, (uint8*)sensor_check, sizeof(sensor_check), NULL);
+	if (check_sensor_delay > 0) {
+	    ret = STATUS_OK;
+		return ret;
+	} else {
+	    check_sensor_delay = 3;
+	}
+	
+	write_ret = vos_dev_write(hUART, (uint8*)sensor_check, strlen(sensor_check), NULL);
 	delay_count = 4;
-
+    
+	offset = 0;
     while(delay_count > 0) {
 	    uart_iocb.ioctl_code = VOS_IOCTL_COMMON_GET_RX_QUEUE_STATUS;
 	    vos_dev_ioctl(hUART, &uart_iocb);
 	    dataAvail = uart_iocb.get.queue_stat;
 
-	    if (dataAvail > 0) {
+	    if (dataAvail == 16) {
             if (dataAvail > sizeof(buffer)) {
 		        dataAvail = sizeof(buffer);
 		    }
 
 			// read from UART
-		    status = vos_dev_read(hUART, &buffer[offset], dataAvail, &actual);
+		    read_ret = vos_dev_read(hUART, &buffer[offset], dataAvail, &actual);
 		    offset += actual;
 
+			delay_count = 0;
+			ret = STATUS_OK;
 			/*if (...) {
 			    ret = STATUS_OK;
 			    break;
@@ -1091,10 +1113,11 @@ uint8 check_sensor_connect_status(uint8 *status)
 	    }
     }
 
-    if (STATUS_OK == ret)
+    if (0 == ret) {
 		(*status) = STATUS_SENSOR_READY;
-	else
+    } else {
 		(*status) = STATUS_SENSOR_NOT_READY;
+	}
 	
 	return ret;
 }
@@ -1304,7 +1327,7 @@ uint8 read_sensor_exec(running_exec *exec)
 	unsigned char raw_buffer[PACKET_DATA_SIZE];
 	unsigned char buffer[PACKET_DATA_SIZE];
 
-	status = vos_dev_write(hUART, (uint8*)sensor_request, sizeof(sensor_request), NULL);
+	status = vos_dev_write(hUART, (uint8*)sensor_request, strlen(sensor_request), NULL);
     delay_count = 4;
 	offset = 0;
 	exec->instruction_exec_status = INSTRUCTION_EXEC_RUNNING;
@@ -1404,10 +1427,12 @@ uint8 send_shaker_command(uint8 *cmd, uint8 cmd_len)
 	uint8 compare_result = TRUE;
 	uint8 buffer[16];
 	uint8 ret = 0;
+	uint8 try_count = 3;
 	
     do {
+		try_count--;
 	    ret = write_data_to_shaker(cmd, cmd_len, &actualw);
-		ret = read_data_from_shaker(buffer, 16, &actualr);
+		ret = read_data_from_shaker(buffer, cmd_len, &actualr);
 
         compare_result = TRUE;
 		if (actualr == cmd_len) {
@@ -1421,7 +1446,7 @@ uint8 send_shaker_command(uint8 *cmd, uint8 cmd_len)
 	        compare_result = FALSE;
 	    }
 		/* need timeout exception */
-	} while (FALSE == compare_result);
+	} while ((FALSE == compare_result) && (try_count > 0));
 
 	return ret;
 }
@@ -1430,7 +1455,7 @@ uint8 shaker_on_exec(running_exec *exec)
 {
     uint8 ret = 0;
 	
-    ret = send_shaker_command(shaker_on, sizeof(shaker_on));
+    ret = send_shaker_command(shaker_on, strlen(shaker_on));
 	
 	exec->next_instruct_index = exec->current_instruct_index+1;
 	exec->instruction_exec_status = INSTRUCTION_EXEC_END;
@@ -1442,7 +1467,7 @@ uint8 shaker_off_exec(running_exec *exec)
 {
     uint8 ret = 0;
 	
-    ret = send_shaker_command(shaker_off, sizeof(shaker_off));
+    ret = send_shaker_command(shaker_off, strlen(shaker_off));
 	
 	exec->next_instruct_index = exec->current_instruct_index+1;
 	exec->instruction_exec_status = INSTRUCTION_EXEC_END;
@@ -1455,10 +1480,10 @@ uint8 shaker_set_temperature_exec(running_exec *exec)
     uint8 ret = 0;
 	uint8 buffer[6];
 	
-    ret = send_shaker_command(shaker_temperature, sizeof(shaker_temperature));
+    ret = send_shaker_command(shaker_temperature, strlen(shaker_temperature));
 	transfer_number_to_string(buffer, 2, exec->script.arg1);
 	ret = send_shaker_command(buffer, 2);
-	ret = send_shaker_command(shaker_end, sizeof(shaker_end));
+	ret = send_shaker_command(shaker_end, strlen(shaker_end));
 	
 	exec->next_instruct_index = exec->current_instruct_index+1;
 	exec->instruction_exec_status = INSTRUCTION_EXEC_END;
@@ -1471,11 +1496,11 @@ uint8 shaker_set_speed_exec(running_exec *exec)
     uint8 ret = 0;
 	uint8 buffer[6];
 	
-    ret = send_shaker_command(shaker_speed, sizeof(shaker_speed));
+    ret = send_shaker_command(shaker_speed, strlen(shaker_speed));
 
 	transfer_number_to_string(buffer, 3, exec->script.arg1);
 	ret = send_shaker_command(buffer, 2);
-	ret = send_shaker_command(shaker_end, sizeof(shaker_end));
+	ret = send_shaker_command(shaker_end, strlen(shaker_end));
 	
 	exec->next_instruct_index = exec->current_instruct_index+1;
 	exec->instruction_exec_status = INSTRUCTION_EXEC_END;
@@ -1543,8 +1568,9 @@ void experiment_task()
 		vos_gpio_write_pin(GPIO_B_3, 0);
 		vos_delay_msecs(100);
 		vos_gpio_write_pin(GPIO_B_3, 1);
-		
-	*/	device_status = 0;
+	*/	
+	    vos_delay_msecs(1);
+	    device_status = 0;
 	    if (STATUS_OK != check_mass_storage_connect_status(&machine_info.mass_storage_status))
 			device_status = (device_status<<1)|0x01;
 
@@ -1609,7 +1635,14 @@ void experiment_task()
 			} else {
                 //machine_info.experiment_status = STATUS_EXPERIMENT_STOP;
 			}
-	    }
+	    } else if (STATUS_EXPERIMENT_STOP == machine_info.experiment_status) {
+            machine_info.experiment_status = STATUS_EXPERIMENT_IDLE;
+			memset(&current_instruction, 0, sizeof(running_exec));
+			current_instruction.instruction_exec_status = INSTRUCTION_EXEC_END;
+			current_instruction.current_instruct_index = 0;
+			current_instruction.next_instruct_index = 1;
+			memset(repeat_time, 0, sizeof(repeat_time));
+		}
     }
 }
 	
