@@ -523,21 +523,31 @@ uint8 write_sensor_data_to_file(unsigned char *buf, unsigned short len)
 	return ret;
 }
 
-uint8 read_data_from_shaker(uint8 *data, uint8 len, uint16 *actualw)
+uint8 read_data_from_shaker(uint8 *data, uint8 len, uint8 max_len, uint16 *actualw)
 {	
 	uint8 status = 1;
-	common_ioctl_cb_t ft232_iocb;
+	uint8 avail_len = 0;
+	common_ioctl_cb_t iocb;
 	uint8 time_out_count = 5;
-	uint16 offset = 0;
 
+	*actualw = 0;
     while ((hUSBHOST_FT232 != NULL) && (time_out_count > 0)) {
-		vos_delay_msecs(1);
 		time_out_count--;
-      
-		status = vos_dev_read(hUSBHOST_FT232, &data[offset], len, actualw); 		// read from FT232 device
-		offset += *actualw;
-		if (offset >= len)			
-			break;
+		vos_delay_msecs(100);
+		iocb.ioctl_code = VOS_IOCTL_COMMON_GET_RX_QUEUE_STATUS;
+		status = vos_dev_ioctl(hUSBHOST_FT232, &iocb);
+
+		if (status == USBHOSTFT232_OK) {
+		    avail_len = iocb.get.queue_stat;
+			if (avail_len > max_len) {
+				avail_len = max_len;
+			}
+			
+			if (avail_len > 0) {
+		        status = vos_dev_read(hUSBHOST_FT232, data, avail_len, actualw); 		// read from FT232 device
+	            break;
+			}
+		}
 	}
 		
 	return status;
@@ -1427,35 +1437,37 @@ uint8 send_shaker_command(uint8 *cmd, uint8 cmd_len)
 	uint8 compare_result = TRUE;
 	uint8 buffer[16];
 	uint8 ret = 0;
-	uint8 try_count = 3;
 	
-    do {
-		try_count--;
-	    ret = write_data_to_shaker(cmd, cmd_len, &actualw);
-		ret = read_data_from_shaker(buffer, cmd_len, &actualr);
+	vos_delay_msecs(100);
+	ret = write_data_to_shaker(cmd, cmd_len, &actualw);
+	memset(buffer, 0, sizeof(buffer));
+	ret = read_data_from_shaker(buffer, cmd_len, 16, &actualr);
 
-        compare_result = TRUE;
-		if (actualr == cmd_len) {
-		    for (i = 0; i < actualr; i++) {
-			    if (buffer[i] != cmd[i]) {
-			        compare_result = FALSE;
-				    break;
-			    }		
-		    }	
-	    } else {
-	        compare_result = FALSE;
-	    }
-		/* need timeout exception */
-	} while ((FALSE == compare_result) && (try_count > 0));
+	compare_result = TRUE;
+	if (actualr == cmd_len) {
+		for (i = 0; i < actualr; i++) {
+			if (buffer[i] != cmd[i]) {
+				compare_result = FALSE;
+				break;
+			}		
+		}	
+	} else {
+		compare_result = FALSE;
+	}
 
-	return ret;
+	return compare_result;
 }
 
 uint8 shaker_on_exec(running_exec *exec) 
 {
     uint8 ret = 0;
+	uint8 retry_count = 3;
 	
-    ret = send_shaker_command(shaker_on, strlen(shaker_on));
+	while((retry_count--) > 0) {
+        ret = send_shaker_command(shaker_on, strlen(shaker_on));
+	    if (TRUE == ret)
+		    break;
+	}
 	
 	exec->next_instruct_index = exec->current_instruct_index+1;
 	exec->instruction_exec_status = INSTRUCTION_EXEC_END;
@@ -1466,8 +1478,13 @@ uint8 shaker_on_exec(running_exec *exec)
 uint8 shaker_off_exec(running_exec *exec) 
 {
     uint8 ret = 0;
+	uint8 retry_count = 3;
 	
-    ret = send_shaker_command(shaker_off, strlen(shaker_off));
+	while((retry_count--) > 0) {
+        ret = send_shaker_command(shaker_off, strlen(shaker_off));
+	    if (TRUE == ret)
+		    break;
+	}
 	
 	exec->next_instruct_index = exec->current_instruct_index+1;
 	exec->instruction_exec_status = INSTRUCTION_EXEC_END;
@@ -1479,11 +1496,27 @@ uint8 shaker_set_temperature_exec(running_exec *exec)
 {
     uint8 ret = 0;
 	uint8 buffer[6];
+	uint8 retry_count = 3;
 	
-    ret = send_shaker_command(shaker_temperature, strlen(shaker_temperature));
-	transfer_number_to_string(buffer, 2, exec->script.arg1);
-	ret = send_shaker_command(buffer, 2);
-	ret = send_shaker_command(shaker_end, strlen(shaker_end));
+	while((retry_count--) > 0) {
+		ret = 0;
+        if (FALSE == send_shaker_command(&shaker_temperature[0], 1))
+		    ret++;
+		if (FALSE == send_shaker_command(&shaker_temperature[1], 1))
+		    ret++;
+		transfer_number_to_string(buffer, 2, exec->script.arg1);
+	    if (FALSE == send_shaker_command(&buffer[0], 1))
+		    ret++;
+		if (FALSE == send_shaker_command(&buffer[1], 1))
+		    ret++;
+	    if (FALSE == send_shaker_command(&shaker_end[0], 1))
+		    ret++;
+		if (FALSE == send_shaker_command(&shaker_end[1], 1))
+		    ret++;
+			
+		if (0 == ret)
+		    break;
+	}
 	
 	exec->next_instruct_index = exec->current_instruct_index+1;
 	exec->instruction_exec_status = INSTRUCTION_EXEC_END;
@@ -1496,11 +1529,31 @@ uint8 shaker_set_speed_exec(running_exec *exec)
     uint8 ret = 0;
 	uint8 buffer[6];
 	
-    ret = send_shaker_command(shaker_speed, strlen(shaker_speed));
-
-	transfer_number_to_string(buffer, 3, exec->script.arg1);
-	ret = send_shaker_command(buffer, 2);
-	ret = send_shaker_command(shaker_end, strlen(shaker_end));
+	uint8 retry_count = 3;
+	
+	while((retry_count--) > 0) {
+		ret = 0;
+        if (FALSE == send_shaker_command(&shaker_speed[0], 1))
+	         ret++;
+		if (FALSE == send_shaker_command(&shaker_speed[1], 1))
+	         ret++;
+		if (FALSE == send_shaker_command(&shaker_speed[2], 1))
+	         ret++;
+	    transfer_number_to_string(buffer, 3, exec->script.arg1);
+		if (FALSE == send_shaker_command(&buffer[0], 1))
+	        ret++;
+		if (FALSE == send_shaker_command(&buffer[1], 1))
+	        ret++;
+		if (FALSE == send_shaker_command(&buffer[2], 1))
+	        ret++;
+	    if (FALSE == send_shaker_command(&shaker_end[0], 1))
+	        ret++;
+		if (FALSE == send_shaker_command(&shaker_end[1], 1))
+	        ret++;
+		
+	    if (0 == ret)
+	        break;
+	}
 	
 	exec->next_instruct_index = exec->current_instruct_index+1;
 	exec->instruction_exec_status = INSTRUCTION_EXEC_END;

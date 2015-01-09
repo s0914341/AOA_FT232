@@ -12,7 +12,7 @@
 		<CompilerOptions>
 			<KeepFiles>Default</KeepFiles>
 			<DebugLevel>1</DebugLevel>
-			<OptimizeLevel>4</OptimizeLevel>
+			<OptimizeLevel>0</OptimizeLevel>
 			<OptionalMacros></OptionalMacros>
 			<MaxError></MaxError>
 			<MaxWarning></MaxWarning>
@@ -951,7 +951,127 @@
 		<fileType>4</fileType>
 		<isFileDirty>false</isFileDirty>
 		<VirtualFolder>{00000000-0000-0000-0000-000000000006}</VirtualFolder>
-	</LibraryFiles>	<BuildList>
+	</LibraryFiles>	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	<BuildList>
 		<filename>AOAtoFT232.c</filename>
 	</BuildList>
 	<BuildList>
@@ -1003,11 +1123,35 @@
 	<OpenFilesList>
 		<filename>AOAtoFT232_iomux.c</filename>
 	</OpenFilesList>
-	<OpenFilesList>
-		<filename>FirmwareUpdate.h</filename>
-	</OpenFilesList>
+	<BreakPointList>
+		<filename>AOAtoFT232.c</filename>
+		<lineNo>612</lineNo>
+		<isEnabled>true</isEnabled>
+	</BreakPointList>
+	<BreakPointList>
+		<filename>AOAtoFT232.c</filename>
+		<lineNo>576</lineNo>
+		<isEnabled>true</isEnabled>
+	</BreakPointList>
+	<BreakPointList>
+		<filename>AOAtoFT232.c</filename>
+		<lineNo>540</lineNo>
+		<isEnabled>true</isEnabled>
+	</BreakPointList>
 	<WatchVariableList>
-		<WatchVarName>cmd_len</WatchVarName>
+		<WatchVarName>avail_len</WatchVarName>
+		<DisplayType>2</DisplayType>
+	</WatchVariableList>
+	<WatchVariableList>
+		<WatchVarName>status</WatchVarName>
+		<DisplayType>2</DisplayType>
+	</WatchVariableList>
+	<WatchVariableList>
+		<WatchVarName>buffer</WatchVarName>
+		<DisplayType>2</DisplayType>
+	</WatchVariableList>
+	<WatchVariableList>
+		<WatchVarName>actualr</WatchVarName>
 		<DisplayType>2</DisplayType>
 	</WatchVariableList>
 </Project>
